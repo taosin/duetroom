@@ -1,0 +1,74 @@
+import { createRoot } from "react-dom/client";
+import { useEffect, useState } from "react";
+import Login from "./Login";
+import { Brand, Language, type Lang } from "./ui";
+import "./base.css";
+
+function App() {
+  const [lang, setLang] = useState<Lang>(() =>
+    localStorage.getItem("duet.lang") === "zh"
+      ? "zh"
+      : localStorage.getItem("duet.lang") === "en"
+        ? "en"
+        : navigator.language.startsWith("zh")
+          ? "zh"
+          : "en",
+  );
+  const [session, setSession] = useState<"loading" | "in" | "out" | "error">(
+    "loading",
+  );
+  useEffect(() => {
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    localStorage.setItem("duet.lang", lang);
+  }, [lang]);
+  useEffect(() => {
+    fetch("/api/session")
+      .then((r) => setSession(r.ok ? "in" : r.status === 401 ? "out" : "error"))
+      .catch(() => setSession("error"));
+  }, []);
+  const zh = lang === "zh";
+  if (session === "loading")
+    return (
+      <p role="status" className="loading">
+        {zh ? "正在打开…" : "Opening…"}
+      </p>
+    );
+  if (session === "error")
+    return (
+      <main className="loading">
+        <p>
+          {zh
+            ? "连接失败，请检查服务是否已启动。"
+            : "Could not connect to DuetRoom."}
+        </p>
+        <button onClick={() => location.reload()}>
+          {zh ? "重试" : "Retry"}
+        </button>
+      </main>
+    );
+  if (session === "out")
+    return (
+      <Login lang={lang} setLang={setLang} onLogin={() => setSession("in")} />
+    );
+  async function logout() {
+    const r = await fetch("/api/session", { method: "DELETE" });
+    if (r.ok || r.status === 401) setSession("out");
+  }
+  return (
+    <div className="home">
+      <header className="topline">
+        <Brand />
+        <div className="controls">
+          <Language lang={lang} setLang={setLang} />
+          <button onClick={() => void logout()}>
+            {zh ? "退出" : "Sign out"}
+          </button>
+        </div>
+      </header>
+      <main>
+        <h1>{zh ? "我的房间" : "My room"}</h1>
+      </main>
+    </div>
+  );
+}
+createRoot(document.getElementById("root")!).render(<App />);

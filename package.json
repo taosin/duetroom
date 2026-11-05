@@ -1,0 +1,33 @@
+{
+  "name": "duetroom",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server/main.ts",
+    "start": "tsx src/server/main.ts",
+    "build": "vite build",
+    "check": "tsc --noEmit && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11",
+    "better-sqlite3": "^11.10.0",
+    "fastify": "^5",
+    "react": "^19",
+    "react-dom": "^19",
+    "tsx": "^4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "~5.8.3",
+    "vite": "^6.4",
+    "vitest": "^4.1.0"
+  }
+}

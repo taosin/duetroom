@@ -1,0 +1,243 @@
+:root {
+  font-family:
+    Inter,
+    "Avenir Next",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #223a32;
+  background: #f8f7f1;
+  font-synthesis: none;
+  color-scheme: light;
+  --ink: #223a32;
+  --muted: #65766c;
+  --line: #d6dbcf;
+  --paper: #f8f7f1;
+  --green: #1c5145;
+  --clay: #ae603d;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+a {
+  color: var(--green);
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid #d09361;
+  outline-offset: 3px;
+}
+button,
+input,
+select,
+textarea {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+button {
+  background: #fffdf7;
+  color: var(--ink);
+  padding: 0.62rem 0.9rem;
+}
+input,
+textarea,
+select {
+  width: 100%;
+  color: var(--ink);
+  background: #fffefa;
+  padding: 0.82rem 0.94rem;
+}
+textarea {
+  resize: vertical;
+}
+label {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.035em;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: Georgia, serif;
+  font-size: 29px;
+  font-weight: 600;
+  letter-spacing: -1.2px;
+}
+.brand img {
+  width: 38px;
+  height: 38px;
+}
+.topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.quiet {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+}
+.primary {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+  font-weight: 600;
+}
+.primary:hover {
+  background: #143d34;
+}
+.gate {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  padding: 20px;
+  gap: 20px;
+}
+.gate-main {
+  padding: clamp(18px, 4vw, 60px);
+  display: flex;
+  flex-direction: column;
+}
+.gate-content {
+  width: min(100%, 360px);
+  margin: auto;
+  padding: 48px 0;
+}
+.gate-content h1 {
+  font-family: Georgia, "Songti SC", serif;
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 500;
+  margin-bottom: 12px;
+  line-height: 1.15;
+}
+.gate-content p,
+.subtle {
+  line-height: 1.6;
+  color: var(--muted);
+}
+.gate-content form {
+  display: grid;
+  gap: 18px;
+  margin-top: 38px;
+}
+.gate-content .primary {
+  padding: 14px;
+}
+.gate-art {
+  border-radius: 22px;
+  background: #a3c0ad url("/room.svg") center 55% / cover no-repeat;
+}
+.feedback {
+  color: #944229;
+  font-size: 0.88rem;
+}
+.selfhost {
+  color: var(--muted);
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selfhost:before {
+  content: "";
+  background: #5c876b;
+  border-radius: 100%;
+  width: 7px;
+  height: 7px;
+}
+.loading {
+  padding: 3rem;
+}
+.home {
+  max-width: 1050px;
+  margin: auto;
+  padding: 2rem;
+}
+.home main {
+  padding: 4rem 0;
+}
+.secret {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+}
+.secret input {
+  padding-right: 65px;
+}
+.secret button {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  font-size: 0.8rem;
+}
+.error-note {
+  color: #934c39;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 720px) {
+  .gate {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 0;
+  }
+  .gate-art {
+    grid-row: 1;
+    height: clamp(160px, 28vh, 240px);
+    border-radius: 0;
+    background-position: center 65%;
+  }
+  .gate-main {
+    padding: 24px;
+    min-height: 62svh;
+  }
+  .gate-content {
+    padding: 30px 0;
+  }
+  .brand {
+    font-size: 26px;
+  }
+  .gate-content h1 {
+    font-size: 42px;
+  }
+  .home {
+    padding: 20px;
+  }
+}

@@ -1,0 +1,18 @@
+services:
+  duetroom:
+    build: .
+    ports:
+      - "127.0.0.1:3647:3647"
+    environment:
+      DUET_PUBLIC_ORIGIN: ${DUET_PUBLIC_ORIGIN:-http://localhost:3647}
+      DUET_OWNER_PASSWORD_FILE: /run/secrets/owner
+    secrets:
+      - owner
+    volumes:
+      - data:/data
+    restart: unless-stopped
+secrets:
+  owner:
+    file: ${DUET_OWNER_PASSWORD_FILE:?Set the absolute path to your owner password file}
+volumes:
+  data: {}

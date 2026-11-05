@@ -49,3 +49,11 @@
 .env
 .env.*
 .DS_Store
+node_modules/
+dist/
+coverage/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
