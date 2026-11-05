@@ -228,8 +228,8 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
       {cursor!==null && <button className="duet-older" onClick={()=>void refresh(cursor)}>{t.older}</button>}
       {!loaded && !error && <p className="duet-loading">{t.loading}</p>}
       {loaded && !turns.length && <div className="duet-empty">
-        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true"><path d="M8 24c0-8 7-14 16-14s16 6 16 14-7 14-16 14c-2 0-5-.4-7-1.3L9 40l2-8c-2-2.1-3-5-3-8Z" fill="#dbe6d8"/><path d="M25 38c1.5 5 7.1 8 13 8 2.4 0 4.7-.6 6.6-1.5L51 47l-1.7-6.2c2-2 2.7-4.3 2.7-6.8 0-6.5-5.1-11.3-11.4-12.1" stroke="#779884" strokeWidth="1.6" strokeLinejoin="round"/></svg>
-        <h3>{t.empty}</h3><p>{t.first(companion.name)}</p>
+        <img className="duet-window" src="/room.svg" alt=""/>
+        <h3>{configured === false ? companion.name : t.empty}</h3>{configured !== false && <p>{t.first(companion.name)}</p>}
       </div>}
       {turns.map((turn,i)=>{
         const date=new Date(turn.createdAt)

@@ -55,3 +55,5 @@
 }
 .duet-threadbar select {width:auto;max-width:65%;min-width:0;border:none;background:transparent;padding:5px 2px;color:var(--muted);font-size:.82rem;text-overflow:ellipsis}
 .duet-threadbar button {flex:none;border:0;padding:6px 3px;background:transparent;color:var(--green);font-size:.82rem}
+
+.duet-window { width:clamp(110px,19vh,195px); height:clamp(80px,16vh,150px); max-height:55%; object-fit:cover; object-position:50% 66%; border-radius:90px 90px 10px 10px; }

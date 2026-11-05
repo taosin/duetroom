@@ -218,3 +218,18 @@
     padding: 20px;
   }
 }
+
+/* Keep the composer in view and let the message history do the scrolling. */
+@media (min-height: 580px) {
+  .studio { display:flex; flex-direction:column; height:100dvh; }
+  .studio-bar, .room-bar { flex-shrink:0; }
+  .studio-columns { flex:1; min-height:0; }
+  .people { overflow:auto; }
+  .room { min-height:0; overflow:auto; }
+  .room .duet-chat { flex:1; min-height:0; border:0; border-radius:0; }
+  .room .duet-history { flex:1; min-height:70px; height:auto; }
+  .duet-chatbar, .duet-threadbar, .duet-notice, .duet-composer { flex-shrink:0; }
+}
+.call-panel { max-width:min(360px, 58vw); font-size:.86rem; }
+.call-panel p { margin:4px 0 8px; line-height:1.45; }
+.call-panel button { margin-inline-end:4px; }
