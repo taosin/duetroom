@@ -2,13 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import './chat.css'
 
 export type ChatSource = {turnId:string;role:'user'|'assistant';text:string;createdAt:number;timeZone:string}
+type Thread = {id:string;title:string;createdAt:number;active:boolean}
 type Turn = {
   id:string;clientMessageId:string;userText:string;assistantText:string;status:'running'|'awaiting'|'interrupted'|'complete'|'failed';
   mode:'text'|'voice';createdAt:number;timeZone:string
 }
 type ChatProps = {
   companion:{id:string;name:string;locale:string;persona:string;voice:string};lang:'zh'|'en';
-  renderCall?:(controls:{refresh:()=>void;busy:boolean;setCallActive:(active:boolean)=>void})=>ReactNode;
+  renderCall?:(controls:{refresh:()=>void;busy:boolean;conversationId?:string;setCallActive:(active:boolean)=>void})=>ReactNode;
   renderMessageAction?:(source:ChatSource)=>ReactNode
 }
 
@@ -21,7 +22,7 @@ const copy = {
     network:'连接已中断。重新连接后可查看已保存的消息。',reload:'重新连接',login:'登录已过期，请刷新页面重新登录。',
     clear:'清除聊天记录',confirm:'清除这段对话及其关联的记忆？',erase:'确认清除',cancel:'取消',voice:'通话',limit:'回复已达到长度上限。',
     invalid:'消息无法发送，请检查内容后重试。',conversation:'对话',check:'检查模型连接',working:'正在检查…',checked:'模型连接成功。',
-    more:'对话选项',today:'今天',callActive:'通话中，挂断后可以打字。'
+    newChat:'新建对话',untitled:'新对话',choose:'切换对话',changed:'另一页面已切换对话。请确认当前对话后继续。',more:'对话选项',today:'今天',callActive:'通话中，挂断后可以打字。'
   },
   en:{
     you:'You',history:'Chat history',empty:'Start with a hello',first:(name:string)=>'Write your first message to '+name+'.',older:'Load earlier messages',
@@ -31,7 +32,7 @@ const copy = {
     network:'Connection lost. Reconnect to see your saved messages.',reload:'Reconnect',login:'Your session expired. Reload the page to sign in.',
     clear:'Clear chat history',confirm:'Clear this conversation and its linked memories?',erase:'Clear conversation',cancel:'Cancel',voice:'Call',limit:'The reply reached its length limit.',
     invalid:'Could not send this message. Check the contents and retry.',conversation:'Conversation',check:'Check model connection',working:'Checking…',checked:'Model connected.',
-    more:'Conversation options',today:'Today',callActive:'End the call to type a message.'
+    newChat:'New conversation',untitled:'New conversation',choose:'Switch conversation',changed:'Another tab switched conversations. Check the selected conversation before continuing.',more:'Conversation options',today:'Today',callActive:'End the call to type a message.'
   }
 }
 function Arrow({stop=false}:{stop?:boolean}) {
@@ -43,6 +44,11 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
   const t=copy[lang]
   const path='/api/companions/'+encodeURIComponent(companion.id)+'/chat'
   const [turns,setTurns]=useState<Turn[]>([])
+  const [threads,setThreads]=useState<Thread[]>([])
+  const [conversationId,setConversationId]=useState('')
+  const [switching,setSwitching]=useState(false)
+  const currentThread=useRef('')
+  const drafts=useRef(new Map<string,string>())
   const [cursor,setCursor]=useState<number|null>(null)
   const [loaded,setLoaded]=useState(false)
   const [configured,setConfigured]=useState<boolean|null>(null)
@@ -69,16 +75,23 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
     if (before) pendingMore.current=true
     const revision=++historyVersion.current
     try {
-      const r=await fetch(path+(before?'?before='+before:''))
-      if (!r.ok) throw Error(r.status===401?'login_required':'connection_lost')
+      const r=await fetch(path+(before?'?before='+before+'&conversationId='+encodeURIComponent(currentThread.current):''))
+      if (!r.ok) throw Error(r.status===401?'login_required':r.status===409?'conversation_changed':'connection_lost')
       const data=await r.json()
       if (!alive.current || revision!==historyVersion.current || socket.current) return
+      if (currentThread.current!==data.conversationId) {
+        currentThread.current=data.conversationId
+        setConversationId(data.conversationId)
+        setDraft(drafts.current.get(data.conversationId) || '')
+        reusable.current=null;follow.current=true;setMenu(false);setConfirm(false)
+      }
+      setThreads(data.conversations)
       if (before) anchorHeight.current=view.current?.scrollHeight ?? null
       setTurns(prev=>before?[...data.turns,...prev]:data.turns)
       setCursor(data.nextCursor);setConfigured(data.modelConfigured);setLoaded(true)
       setError(prev=>prev==='connection_lost'?'':prev)
     } catch(e) {
-      if (alive.current && revision===historyVersion.current) setError(e instanceof Error && e.message==='login_required'?'login_required':'connection_lost')
+      if (alive.current && revision===historyVersion.current) setError(e instanceof Error && ['conversation_changed','login_required'].includes(e.message)?e.message:'connection_lost')
     } finally { if (before) pendingMore.current=false }
   },[path])
   useEffect(()=>{
@@ -117,7 +130,7 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
   },[activeId,rendered])
 
   function send(text:string,clientMessageId:string,retry=false) {
-    if (socket.current || callActive || !text.trim()) return
+    if (socket.current || callActive || switching || !conversationId || !text.trim()) return
     setError('');setBusy(true);setMenu(false);follow.current=true
     let ws:WebSocket
     try {
@@ -131,19 +144,19 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
     let issue=''
     ws.onopen=()=>{
       if (ws!==socket.current) return
-      ws.send(JSON.stringify({type:'text.send',protocolVersion:1,clientMessageId,text,retry,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}))
+      ws.send(JSON.stringify({type:'text.send',protocolVersion:1,conversationId,clientMessageId,text,retry,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}))
     }
     ws.onmessage=({data})=>{
       if (ws!==socket.current) return
       let msg
       try {msg=JSON.parse(data)} catch {issue='connection_lost';ws.close();return}
       if (msg.type==='turn.started') {
-        started=true;reusable.current=null;setDraft('');setActiveId(msg.turn.id)
+        started=true;reusable.current=null;drafts.current.delete(conversationId);setDraft('');setActiveId(msg.turn.id)
         setTurns(rows=>[...rows.filter(row=>row.id!==msg.turn.id),msg.turn])
       } else if (msg.type==='text.delta') {
         setTurns(rows=>rows.map(row=>row.id===msg.turnId?{...row,assistantText:row.assistantText+msg.delta}:row))
       } else if (msg.type==='turn.ended') {concluded=true}
-      else if (msg.type==='snapshot') {concluded=true;reusable.current=null;setDraft('')}
+      else if (msg.type==='snapshot') {concluded=true;reusable.current=null;drafts.current.delete(conversationId);setDraft('')}
       else if (msg.type==='error') {issue=msg.code}
     }
     ws.onerror=()=>{issue='connection_lost'}
@@ -161,13 +174,20 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
     const id=existing?.text===text?existing.id:crypto.randomUUID()
     reusable.current={id,text};send(text,id)
   }
-  async function erase() {
+  async function changeThread(method:'POST'|'PUT'|'DELETE',target='') {
+    if (switching || busy || callActive) return
+    setSwitching(true);setError('')
+    historyVersion.current++
     try {
-      const r=await fetch(path,{method:'DELETE'})
-      if (!r.ok) throw Error()
+      const suffix=target?'/'+encodeURIComponent(target)+(method==='PUT'?'/active':''):''
+      const r=await fetch(path+'/conversations'+suffix,{method})
+      if (!r.ok) throw Error((await r.json()).error)
       if (!alive.current) return
-      setConfirm(false);setMenu(false);setError('');setCursor(null);setTurns([]);void refresh()
-    } catch { if (alive.current) setError('connection_lost') }
+      if(method==='DELETE') drafts.current.delete(target)
+      setConfirm(false);setMenu(false)
+      await refresh()
+    } catch(e) { if(alive.current)setError(e instanceof Error && e.message==='busy'?'busy':'connection_lost') }
+    finally { if(alive.current)setSwitching(false) }
   }
   async function probe() {
     setProbing(true);setProbed(false);setError('')
@@ -179,7 +199,7 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
     } catch {if(alive.current)setError('connection_lost')}
     finally {if(alive.current)setProbing(false)}
   }
-  const message=error==='model_unconfigured'?t.missing:error==='model_unavailable'?t.model:error==='busy'?t.busy:error==='login_required'?t.login:error==='reply_limit'?t.limit:error==='connection_lost'?t.network:t.invalid
+  const message=error==='conversation_changed'?t.changed:error==='model_unconfigured'?t.missing:error==='model_unavailable'?t.model:error==='busy'?t.busy:error==='login_required'?t.login:error==='reply_limit'?t.limit:error==='connection_lost'?t.network:t.invalid
   function bubble(turn:Turn,role:'user'|'assistant') {
     const text=role==='user'?turn.userText:turn.assistantText
     if (!text) return null
@@ -190,13 +210,19 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
   }
   return <section className="duet-chat" aria-label={t.conversation}>
     <div className="duet-chatbar"><h2>{t.conversation}</h2><div className="duet-chattools">
-      {renderCall?.({refresh,busy,setCallActive})}
+      {renderCall?.({refresh,busy:busy || switching,conversationId:conversationId || undefined,setCallActive})}
       <button type="button" className="duet-more" aria-label={t.more} aria-expanded={menu} onClick={()=>setMenu(!menu)}>•••</button>
-      {menu && <div className="duet-options"><button disabled={busy||probing||callActive} onClick={()=>void probe()}>{probing?t.working:t.check}</button><button disabled={!turns.length || busy || callActive} onClick={()=>{setConfirm(true);setMenu(false)}}>{t.clear}</button></div>}
+      {menu && <div className="duet-options"><button disabled={busy||switching||probing||callActive} onClick={()=>void probe()}>{probing?t.working:t.check}</button><button disabled={(!turns.length && threads.length<=1) || busy || switching || callActive} onClick={()=>{setConfirm(true);setMenu(false)}}>{t.clear}</button></div>}
     </div></div>
-    {confirm && <div className="duet-notice"><span>{t.confirm}</span><button onClick={()=>setConfirm(false)}>{t.cancel}</button><button onClick={()=>void erase()}>{t.erase}</button></div>}
+    {loaded && <div className="duet-threadbar">
+      <select aria-label={t.choose} value={conversationId} disabled={busy||callActive||switching} onChange={e=>void changeThread('PUT',e.target.value)}>
+        {threads.map(row=><option key={row.id} value={row.id}>{row.title || t.untitled} · {new Date(row.createdAt).toLocaleDateString(lang==='zh'?'zh-CN':'en',{month:'short',day:'numeric'})}</option>)}
+      </select>
+      <button type="button" disabled={busy||callActive||switching} onClick={()=>void changeThread('POST')}><span aria-hidden="true">＋</span> {t.newChat}</button>
+    </div>}
+    {confirm && <div className="duet-notice"><span>{t.confirm}</span><button onClick={()=>setConfirm(false)}>{t.cancel}</button><button disabled={switching} onClick={()=>void changeThread('DELETE',conversationId)}>{t.erase}</button></div>}
     {configured===false && <div className="duet-notice" role="status">{t.missing}</div>}
-    {error && !(configured===false && error==='model_unconfigured') && <div className="duet-notice" role="alert"><span>{message}</span>{error==='connection_lost' && <button onClick={()=>void refresh()}>{t.reload}</button>}</div>}
+    {error && !(configured===false && error==='model_unconfigured') && <div className="duet-notice" role="alert"><span>{message}</span>{(error==='connection_lost'||error==='conversation_changed') && <button onClick={()=>void refresh()}>{t.reload}</button>}</div>}
     {probed && !error && <div className="duet-notice" role="status">{t.checked}</div>}
     <div className="duet-history" aria-label={t.history} ref={view} onScroll={()=>{const el=view.current;if(el)follow.current=el.scrollHeight-el.scrollTop-el.clientHeight<72}}>
       {cursor!==null && <button className="duet-older" onClick={()=>void refresh(cursor)}>{t.older}</button>}
@@ -221,14 +247,14 @@ function Chat({companion,lang,renderCall,renderMessageAction}: ChatProps) {
       })}
     </div>
     <form className="duet-composer" onSubmit={event=>{event.preventDefault();submit()}}>
-      <textarea ref={input} rows={2} maxLength={4000} value={draft} disabled={busy || callActive} aria-label={t.placeholder(companion.name)} placeholder={callActive?t.callActive:t.placeholder(companion.name)}
-        onChange={event=>setDraft(event.target.value)} onKeyDown={event=>{
+      <textarea ref={input} rows={2} maxLength={4000} value={draft} disabled={busy || switching || callActive} aria-label={t.placeholder(companion.name)} placeholder={callActive?t.callActive:t.placeholder(companion.name)}
+        onChange={event=>{setDraft(event.target.value);drafts.current.set(conversationId,event.target.value)}} onKeyDown={event=>{
           if (event.key==='Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode!==229 && !window.matchMedia('(pointer: coarse)').matches) {
             event.preventDefault();submit()
           }
         }}/>
       {busy?<button type="button" className="duet-send" aria-label={t.stop} title={t.stop} onClick={()=>{const ws=socket.current;if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'interrupt'}));else ws?.close()}}><Arrow stop/></button>
-      :<button className="duet-send" type="submit" disabled={!draft.trim() || configured!==true || callActive} aria-label={t.send} title={t.send}><Arrow/></button>}
+      :<button className="duet-send" type="submit" disabled={!draft.trim() || configured!==true || switching || callActive} aria-label={t.send} title={t.send}><Arrow/></button>}
     </form>
   </section>
 }

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
+import { activeConversation, insertConversation, migrateConversations } from './conversations'
+export {getConversations} from './conversations'
 import { ChatError, MAX_REPLY_LENGTH, streamReply, type ModelMessage } from './model'
 
 type DB = Database.Database
@@ -13,13 +15,13 @@ export interface ChatHooks {
   context?(db: DB, companionId: string, userText: string): string
   transform?(db: DB, companionId: string, turnId: string, source: AsyncIterable<string>): AsyncIterable<string>
   onDelivered?(db: DB, companionId: string, turnId: string): void
-  onDelete?(db: DB, companionId: string): void
+  onDelete?(db: DB, companionId: string, conversationId: string): void
 }
 interface Generation { id: string; controller: AbortController; generated: string; offset: number; finished: boolean }
 export interface Writer { readonly signal: AbortSignal; release(): void }
-type Lease = { writer: Writer; current?: Generation }
+type Lease = { writer: Writer; conversationId: string; current?: Generation }
 const states = new WeakMap<DB, { writers: Map<string, Lease>; hooks: ChatHooks }>()
-const columns = 'rowid AS cursor,id,client_message_id AS clientMessageId,user_text AS userText,delivered_text AS assistantText,mode,status,created_at AS createdAt,time_zone AS timeZone'
+const columns = 'rowid AS cursor,id,request_id AS clientMessageId,user_text AS userText,delivered_text AS assistantText,mode,status,created_at AS createdAt,time_zone AS timeZone'
 
 export function initChat(db: DB) {
   if (states.has(db)) return
@@ -33,6 +35,7 @@ export function initChat(db: DB) {
     CREATE INDEX IF NOT EXISTS chat_turns_by_companion ON chat_turns(companion_id);
     UPDATE chat_turns SET status='interrupted' WHERE status IN ('running','awaiting');
   `)
+  migrateConversations(db)
   states.set(db,{writers:new Map(),hooks:{}})
 }
 function state(db: DB) { initChat(db); return states.get(db)! }
@@ -44,19 +47,20 @@ function companion(db: DB, id: string) {
   return row
 }
 
-export function getHistory(db: DB, id: string, before = Number.MAX_SAFE_INTEGER, limit = 40) {
-  companion(db,id)
-  const rows = db.prepare(`SELECT ${columns} FROM chat_turns WHERE companion_id=? AND rowid<? ORDER BY rowid DESC LIMIT ?`).all(id,before,limit+1) as ChatTurn[]
+export function getHistory(db: DB, id: string, before = Number.MAX_SAFE_INTEGER, limit = 40, expected?: string) {
+  const conversationId=activeConversation(db,id,expected)
+  const rows = db.prepare(`SELECT ${columns} FROM chat_turns WHERE companion_id=? AND conversation_id=? AND rowid<? ORDER BY rowid DESC LIMIT ?`).all(id,conversationId,before,limit+1) as ChatTurn[]
   const more = rows.length > limit
   if (more) rows.pop()
   rows.reverse()
-  return { turns: rows, nextCursor: more ? rows[0].cursor : null }
+  return { conversationId, turns: rows, nextCursor: more ? rows[0].cursor : null }
 }
-export function findTurn(db: DB, id: string, clientId: string) {
-  return db.prepare(`SELECT ${columns} FROM chat_turns WHERE companion_id=? AND client_message_id=?`).get(id,clientId) as ChatTurn | undefined
+export function findTurn(db: DB, id: string, clientId: string, expected?:string) {
+  const conversationId=activeConversation(db,id,expected)
+  return db.prepare(`SELECT ${columns} FROM chat_turns WHERE companion_id=? AND conversation_id=? AND request_id=?`).get(id,conversationId,clientId) as ChatTurn | undefined
 }
-export function acquireWriter(db: DB, id: string): Writer {
-  companion(db,id)
+export function acquireWriter(db: DB, id: string, expected?:string): Writer {
+  const conversationId=activeConversation(db,id,expected)
   const writers = state(db).writers
   if (writers.has(id)) throw new ChatError('busy')
   const controller = new AbortController()
@@ -70,19 +74,43 @@ export function acquireWriter(db: DB, id: string): Writer {
       controller.abort()
     }
   }
-  writers.set(id,{writer})
+  writers.set(id,{writer,conversationId})
   return writer
 }
 export function cancelWriter(db: DB, id: string) { state(db).writers.get(id)?.writer.release() }
 
-export function clearConversation(db: DB, id: string) {
+export function createConversation(db:DB,id:string) {
   companion(db,id)
-  cancelWriter(db,id)
-  db.transaction(() => {
-    state(db).hooks.onDelete?.(db,id)
-    db.prepare('DELETE FROM chat_turns WHERE companion_id=?').run(id)
+  if (state(db).writers.has(id)) throw new ChatError('busy')
+  return db.transaction(()=>{
+    db.prepare('UPDATE chat_conversations SET active=0 WHERE companion_id=? AND active=1').run(id)
+    return insertConversation(db,id)
   })()
 }
+export function selectConversation(db:DB,id:string,conversationId:string) {
+  const target=db.prepare('SELECT active FROM chat_conversations WHERE companion_id=? AND id=?').get(id,conversationId) as {active:number}|undefined
+  if (!target) throw new ChatError('missing')
+  if (target.active) return
+  if (state(db).writers.has(id)) throw new ChatError('busy')
+  db.transaction(()=>{
+    db.prepare('UPDATE chat_conversations SET active=0 WHERE companion_id=? AND active=1').run(id)
+    db.prepare('UPDATE chat_conversations SET active=1 WHERE id=?').run(conversationId)
+  })()
+}
+export function deleteConversation(db:DB,id:string,conversationId:string) {
+  const target=db.prepare('SELECT active FROM chat_conversations WHERE companion_id=? AND id=?').get(id,conversationId) as {active:number}|undefined
+  if (!target) throw new ChatError('missing')
+  if (state(db).writers.get(id)?.conversationId===conversationId) cancelWriter(db,id)
+  db.transaction(()=>{
+    state(db).hooks.onDelete?.(db,id,conversationId)
+    db.prepare('DELETE FROM chat_conversations WHERE id=? AND companion_id=?').run(conversationId,id)
+    if (target.active) {
+      const fallback=db.prepare('SELECT id FROM chat_conversations WHERE companion_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(id) as {id:string}|undefined
+      if (fallback) db.prepare('UPDATE chat_conversations SET active=1 WHERE id=?').run(fallback.id)
+    }
+  })()
+}
+export function clearConversation(db:DB,id:string) { deleteConversation(db,id,activeConversation(db,id)) }
 export function interruptTurn(db: DB, id: string, turnId: string, writer: Writer) {
   const lease = state(db).writers.get(id)
   const generation = lease?.current
@@ -130,7 +158,7 @@ function messages(db: DB, id: string, profile: ReturnType<typeof companion>, tur
 }
 
 export type ReplyOptions = {
-  writer?: Writer; mode?: 'text' | 'voice'; timeZone?: string; retry?: boolean; onStart?:(turn:ChatTurn)=>void
+  writer?: Writer; conversationId?:string; mode?: 'text' | 'voice'; timeZone?: string; retry?: boolean; onStart?:(turn:ChatTurn)=>void
 }
 export async function runReply(db: DB, id: string, userText: string, clientId: string, signal: AbortSignal,
   onDelta:(delta:string,turnId:string)=>void|Promise<void>, options: ReplyOptions = {}): Promise<ChatTurn> {
@@ -138,14 +166,15 @@ export async function runReply(db: DB, id: string, userText: string, clientId: s
   const timeZone = options.timeZone || 'UTC'
   try { new Intl.DateTimeFormat('en',{timeZone}) } catch { throw new ChatError('invalid_timezone') }
   const profile = companion(db,id)
-  const existing = findTurn(db,id,clientId)
+  const conversationId=activeConversation(db,id,options.conversationId)
+  const existing = findTurn(db,id,clientId,conversationId)
   if (existing && existing.userText !== userText.trim()) throw new ChatError('id_conflict')
   if (existing && !options.retry) return existing
   if (options.retry && (!existing || existing.status !== 'failed' || existing.assistantText || getHistory(db,id,undefined,1).turns[0]?.id !== existing.id)) throw new ChatError('retry_unavailable')
   if (signal.aborted) throw new ChatError('interrupted')
-  const writer = options.writer ?? acquireWriter(db,id)
+  const writer = options.writer ?? acquireWriter(db,id,conversationId)
   const lease = state(db).writers.get(id)
-  if (lease?.writer !== writer) throw new ChatError('interrupted')
+  if (lease?.writer !== writer || lease.conversationId!==conversationId) throw new ChatError('interrupted')
   if (lease.current) {
     const prior = lease.current
     if (!prior.finished || prior.offset !== prior.generated.length) throw new ChatError('busy')
@@ -160,7 +189,8 @@ export async function runReply(db: DB, id: string, userText: string, clientId: s
   }
   try {
     if (existing) db.prepare("UPDATE chat_turns SET status='running' WHERE id=?").run(turnId)
-    else db.prepare("INSERT INTO chat_turns(id,companion_id,client_message_id,user_text,mode,status,created_at,time_zone) VALUES (?,?,?,?,?,'running',?,?)").run(turnId,id,clientId,userText.trim(),options.mode ?? 'text',Date.now(),timeZone)
+    // Use a unique internal value for the original per-companion constraint; request_id is scoped to the thread.
+    else db.prepare("INSERT INTO chat_turns(id,companion_id,conversation_id,client_message_id,request_id,user_text,mode,status,created_at,time_zone) VALUES (?,?,?,?,?,?,?,'running',?,?)").run(turnId,id,conversationId,turnId,clientId,userText.trim(),options.mode ?? 'text',Date.now(),timeZone)
     const turn = findTurn(db,id,clientId)!
     options.onStart?.(turn)
     const source = streamReply(messages(db,id,profile,turn),abort)

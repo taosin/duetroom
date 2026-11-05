@@ -49,3 +49,9 @@
   .duet-message {max-width:91%}
   .duet-chatbar {padding:9px 12px}
 }
+.duet-threadbar {
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:7px clamp(14px,3vw,28px);border-bottom:1px solid #e5e7dd;background:#f6f7ef;
+}
+.duet-threadbar select {width:auto;max-width:65%;min-width:0;border:none;background:transparent;padding:5px 2px;color:var(--muted);font-size:.82rem;text-overflow:ellipsis}
+.duet-threadbar button {flex:none;border:0;padding:6px 3px;background:transparent;color:var(--green);font-size:.82rem}
