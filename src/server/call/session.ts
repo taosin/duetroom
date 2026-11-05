@@ -49,8 +49,9 @@ export function serveCall(
   db: Database.Database,
   companion: Companion,
   authorized: () => boolean,
+  conversationId?: string,
 ) {
-  const writer = acquireWriter(db, companion.id);
+  const writer = acquireWriter(db, companion.id, conversationId);
   let closed = false;
   let started = false;
   let timeZone = "UTC";

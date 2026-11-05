@@ -133,7 +133,21 @@ export default function Workspace({
               <Conversation
                 companion={active}
                 lang={lang}
-                renderCall={({refresh,busy})=>busy?null:<CallPanel companion={active} lang={lang} onHistoryChange={refresh}/>}
+                renderCall={({
+                  refresh,
+                  busy,
+                  conversationId,
+                  setCallActive,
+                }) => (
+                  <CallPanel
+                    companion={active}
+                    lang={lang}
+                    onHistoryChange={refresh}
+                    disabled={busy || !conversationId}
+                    conversationId={conversationId}
+                    onActiveChange={setCallActive}
+                  />
+                )}
                 renderMessageAction={(source) => (
                   <Remember
                     companionId={active.id}

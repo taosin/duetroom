@@ -27,7 +27,7 @@ export function registerCall(app: FastifyInstance, db: Database.Database) {
       };
     }
   });
-  app.get<{ Params: { id: string } }>(
+  app.get<{ Params: { id: string }; Querystring: { conversationId?: string } }>(
     "/api/companions/:id/call",
     { websocket: true },
     (socket, req) => {
@@ -38,7 +38,13 @@ export function registerCall(app: FastifyInstance, db: Database.Database) {
       try {
         if (!companion) throw Error("missing");
         if (sockets >= 3) throw Error("busy");
-        serveCall(socket, db, companion, () => isSessionValid(db, req));
+        const id = req.query.conversationId;
+        if (
+          id !== undefined &&
+          (typeof id !== "string" || !id.length || id.length > 128)
+        )
+          throw Error("conversation_changed");
+        serveCall(socket, db, companion, () => isSessionValid(db, req), id);
         sockets++;
         socket.once("close", () => {
           sockets--;
@@ -49,7 +55,9 @@ export function registerCall(app: FastifyInstance, db: Database.Database) {
         socket.send(
           JSON.stringify({
             type: "error",
-            code: code === "busy" ? "busy" : "missing",
+            code: ["busy", "conversation_changed"].includes(code)
+              ? code
+              : "missing",
           }),
         );
         socket.close(1008);

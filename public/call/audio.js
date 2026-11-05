@@ -28,38 +28,53 @@ class DuetAudio extends AudioWorkletProcessor {
     };
   }
   captureInput(input) {
+    const width = 16000 / sampleRate;
     for (const value of input) {
-      // Integrate over the original sample interval, including fractional boundaries.
-      const width = 16000 / sampleRate;
-      const used = Math.min(width, 1 - this.phase);
-      this.sum += value * used;
-      this.phase += used;
-      if (this.phase < 1 - 1e-9) continue;
-      this.capture[this.count++] = Math.max(
-        -32768,
-        Math.min(32767, Math.round(this.sum * 32768)),
-      );
-      this.phase = width - used;
-      this.sum = value * this.phase;
-      if (this.count === 320) {
-        let energy = 0;
-        for (const sample of this.capture) energy += sample * sample;
-        const voiced = Math.sqrt(energy / 320) > 780;
-        if (voiced && this.queue.length)
-          this.hold = Math.ceil(0.35 * sampleRate);
-        this.port.postMessage(
-          { type: "input", samples: this.capture, voiced },
-          [this.capture.buffer],
+      // Each source sample may cover part of a 16 kHz interval or several.
+      let left = width;
+      while (left > 1e-9) {
+        const used = Math.min(left, 1 - this.phase);
+        this.sum += value * used;
+        left -= used;
+        this.phase += used;
+        if (this.phase < 1 - 1e-9) continue;
+        this.capture[this.count++] = Math.max(
+          -32768,
+          Math.min(32767, Math.round(this.sum * 32768)),
         );
-        this.capture = new Int16Array(320);
-        this.count = 0;
+        this.sum = 0;
+        this.phase = 0;
+        if (this.count === 320) this.sendInput();
       }
     }
+  }
+  sendInput() {
+    let energy = 0;
+    for (const sample of this.capture) energy += sample * sample;
+    const voiced = Math.sqrt(energy / 320) > 780;
+    if (voiced && this.queue.length) this.hold = Math.ceil(0.35 * sampleRate);
+    this.port.postMessage(
+      {
+        type: "input",
+        samples: this.capture,
+        voiced,
+        at: currentFrame / sampleRate,
+      },
+      [this.capture.buffer],
+    );
+    this.capture = new Int16Array(320);
+    this.count = 0;
   }
   setSpeaking(value, offset) {
     this.speaking = value;
     this.port.postMessage({
       type: value ? "speaking" : "listening",
+      bufferedMs:
+        Math.max(
+          0,
+          this.queue.reduce((n, chunk) => n + (chunk.samples?.length || 0), 0) -
+            this.cursor,
+        ) / 24,
       generation: this.generation,
       at: (currentFrame + offset) / sampleRate,
     });

@@ -83,3 +83,43 @@ it("acknowledges a segment only when its final samples have reached the playback
     expect.objectContaining({ type: "played", generation: 1, segment: 1 }),
   );
 });
+
+it.each([8000, 16000, 44100, 48000, 96000])(
+  "captures 50 exact 20ms frames per second at a device rate of %d",
+  (sampleRate) => {
+    let Processor: any;
+    class Base {
+      port = { onmessage: undefined as any, postMessage: vi.fn() };
+    }
+    runInNewContext(
+      readFileSync(new URL("../public/call/audio.js", import.meta.url), "utf8"),
+      {
+        AudioWorkletProcessor: Base,
+        registerProcessor: (_: string, p: any) => {
+          Processor = p;
+        },
+        sampleRate,
+        currentFrame: 0,
+        Int16Array,
+        Float32Array,
+      },
+    );
+    const p = new Processor();
+    const raw = new Float32Array(sampleRate).fill(0.25);
+    for (let offset = 0; offset < sampleRate; offset += 128) {
+      const block = raw.subarray(offset, offset + 128);
+      p.process([[block]], [[new Float32Array(block.length)]]);
+    }
+    const input = p.port.postMessage.mock.calls
+      .flat()
+      .filter((v: any) => v.type === "input");
+    expect(input).toHaveLength(50);
+    expect(
+      input.every(
+        (v: any) =>
+          v.samples.length === 320 &&
+          v.samples.every((n: number) => n === 8192),
+      ),
+    ).toBe(true);
+  },
+);

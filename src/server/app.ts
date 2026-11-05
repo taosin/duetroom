@@ -36,7 +36,7 @@ export function buildApp(config: {
   registerCompanions(app, db, (id) => cancelWriter(db, id));
   app.register(async (scope) => {
     registerChat(scope, db);
-    registerCall(scope,db);
+    registerCall(scope, db);
     registerMemories(scope, db);
     registerMood(db);
     configureChat(db, {

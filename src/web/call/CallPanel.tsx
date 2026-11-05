@@ -33,6 +33,10 @@ const copy = {
     expired: "This session has ended.",
     network: "The call connection was lost.",
     duration: "The 30-minute call ended. You can call again.",
+    background: "The call ended when the page left the foreground.",
+    audio_suspended: "Audio was interrupted. Tap to call again.",
+    conversation_changed:
+      "The active conversation changed. Refresh the chat before calling.",
     call_failed: "The call could not continue.",
   },
   zh: {
@@ -65,6 +69,9 @@ const copy = {
     expired: "会话已结束。",
     network: "通话连接已中断。",
     duration: "本次通话已满 30 分钟，可再次接通。",
+    background: "页面进入后台，通话已结束。",
+    audio_suspended: "设备音频已中断，可手动重新接通。",
+    conversation_changed: "当前对话已切换，请刷新聊天后重新接通。",
     call_failed: "通话无法继续。",
   },
 };
@@ -72,6 +79,9 @@ type Props = {
   companion: { id: string; name: string; locale: string; voice: string };
   lang: "en" | "zh";
   onHistoryChange: () => void;
+  conversationId?: string;
+  disabled?: boolean;
+  onActiveChange?: (isActive: boolean) => void;
 };
 type State =
   | "idle"
@@ -82,7 +92,36 @@ type State =
   | "replying"
   | "error";
 
-export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
+export function CallProblem({
+  lang,
+  code,
+  onBack,
+}: {
+  lang: "en" | "zh";
+  code: string;
+  onBack: () => void;
+}) {
+  const labels = copy[lang];
+  const text = Object.hasOwn(labels, code)
+    ? labels[code as keyof typeof labels]
+    : labels.call_failed;
+  return (
+    <>
+      <p role="alert">{text}</p>
+      <button type="button" onClick={onBack}>
+        {labels.back}
+      </button>
+    </>
+  );
+}
+export default function CallPanel({
+  companion,
+  lang,
+  onHistoryChange,
+  conversationId,
+  disabled,
+  onActiveChange,
+}: Props) {
   const labels = copy[lang];
   const [state, setState] = useState<State>("idle");
   const [model, setModel] = useState("");
@@ -103,6 +142,8 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
   }, [remaining]);
   const current = useRef<ReturnType<typeof openCall> | undefined>(undefined);
   const handle = useRef(0);
+  const activeChange = useRef(onActiveChange);
+  activeChange.current = onActiveChange;
   const history = useRef(onHistoryChange);
   history.current = onHistoryChange;
   function reset() {
@@ -117,10 +158,11 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
     setCaption("");
     return () => {
       handle.current++;
+      if (current.current) activeChange.current?.(false);
       current.current?.close();
       current.current = undefined;
     };
-  }, [companion.id]);
+  }, [companion.id, conversationId]);
   async function prepare() {
     const token = ++handle.current;
     setState("checking");
@@ -153,39 +195,50 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
     setOffer(false);
     setRemaining(undefined);
     setState("connecting");
-    current.current = openCall(companion.id, {
-      event: (e) => {
-        if (handle.current !== token) return;
-        if (e.type === "ready" || e.type === "reply.end") setState("listening");
-        if (e.type === "interrupted" || e.type === "reply") {
-          setOffer(false);
-          setRemaining(undefined);
-          setState(e.type === "reply" ? "replying" : "listening");
-        }
-        if (e.type === "reveal.available") setOffer(true);
-        if (e.type === "reveal.text" && e.text && e.generation !== undefined) {
-          setOffer(false);
-          setRemaining({ text: e.text, generation: e.generation });
-        }
-        if (e.type === "caption" || e.type === "reply")
-          setCaption(e.text || "");
-        if (e.type === "history") history.current();
+    activeChange.current?.(true);
+    current.current = openCall(
+      companion.id,
+      {
+        event: (e) => {
+          if (handle.current !== token) return;
+          if (e.type === "ready" || e.type === "reply.end")
+            setState("listening");
+          if (e.type === "interrupted" || e.type === "reply") {
+            setOffer(false);
+            setRemaining(undefined);
+            setState(e.type === "reply" ? "replying" : "listening");
+          }
+          if (e.type === "reveal.available") setOffer(true);
+          if (
+            e.type === "reveal.text" &&
+            e.text &&
+            e.generation !== undefined
+          ) {
+            setOffer(false);
+            setRemaining({ text: e.text, generation: e.generation });
+          }
+          if (e.type === "caption" || e.type === "reply")
+            setCaption(e.text || "");
+          if (e.type === "history") history.current();
+        },
+        ended: (code) => {
+          if (handle.current !== token) return;
+          current.current = undefined;
+          activeChange.current?.(false);
+          setCaption("");
+          if (code) {
+            setError(code);
+            setState("error");
+          } else setState("idle");
+          history.current();
+        },
       },
-      ended: (code) => {
-        if (handle.current !== token) return;
-        current.current = undefined;
-        setCaption("");
-        if (code) {
-          setError(code);
-          setState("error");
-        } else setState("idle");
-        history.current();
-      },
-    });
+      conversationId,
+    );
   }
   if (state === "idle")
     return (
-      <button type="button" onClick={prepare}>
+      <button type="button" onClick={prepare} disabled={disabled}>
         {labels.call}
       </button>
     );
@@ -198,7 +251,7 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
             {labels.consent} {model || labels.model}
             {lang === "zh" ? "。" : "."} {labels.storage}
           </p>
-          <button type="button" onClick={connect}>
+          <button type="button" onClick={connect} disabled={disabled}>
             {labels.connect}
           </button>
         </>
@@ -209,14 +262,7 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
         </button>
       )}
       {state === "error" && (
-        <>
-          <p role="alert">
-            {labels[error as keyof typeof labels] || labels.call_failed}
-          </p>
-          <button type="button" onClick={reset}>
-            {labels.back}
-          </button>
-        </>
+        <CallProblem lang={lang} code={error} onBack={reset} />
       )}
       {["connecting", "listening", "replying"].includes(state) && (
         <>

@@ -34,14 +34,21 @@ export default function Editor({
     el?.showModal();
     return () => el?.close();
   }, []);
-  const [voices,setVoices]=useState<{id:string;name:string;locale:string}[]>([]);
-  useEffect(()=>{
-    const abort=new AbortController();
-    fetch("/api/call/voices",{signal:abort.signal})
-      .then(async r=>{if(r.ok){const data=await r.json();if(Array.isArray(data.voices))setVoices(data.voices)}})
-      .catch(()=>{});
-    return ()=>abort.abort();
-  },[]);
+  const [voices, setVoices] = useState<
+    { id: string; name: string; locale: string }[]
+  >([]);
+  useEffect(() => {
+    const abort = new AbortController();
+    fetch("/api/call/voices", { signal: abort.signal })
+      .then(async (r) => {
+        if (r.ok) {
+          const data = await r.json();
+          if (Array.isArray(data.voices)) setVoices(data.voices);
+        }
+      })
+      .catch(() => {});
+    return () => abort.abort();
+  }, []);
   const update = (field: keyof CompanionInput, value: string) =>
     setInput((v) => ({ ...v, [field]: value }));
   async function save(e: FormEvent) {
@@ -164,11 +171,25 @@ export default function Editor({
               <option value="en-US">English</option>
             </select>
           </label>
-          <label>{zh?"音色":"Voice"}
-            <select value={input.voice} onChange={e=>update("voice",e.target.value)}>
-              <option value="">{zh?"按对话语言自动选择":"Choose automatically by language"}</option>
-              {input.voice&&!voices.some(v=>v.id===input.voice)&&<option value={input.voice}>{input.voice}</option>}
-              {voices.filter(v=>v.locale===input.locale).map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+          <label>
+            {zh ? "音色" : "Voice"}
+            <select
+              value={input.voice}
+              onChange={(e) => update("voice", e.target.value)}
+            >
+              <option value="">
+                {zh ? "按对话语言自动选择" : "Choose automatically by language"}
+              </option>
+              {input.voice && !voices.some((v) => v.id === input.voice) && (
+                <option value={input.voice}>{input.voice}</option>
+              )}
+              {voices
+                .filter((v) => v.locale === input.locale)
+                .map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
             </select>
           </label>
           <div className="actions">
