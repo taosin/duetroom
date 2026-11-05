@@ -199,8 +199,12 @@ export function serveCall(
         ctl("reveal.available", { generation: a.generation });
         return;
       }
-      if (tail && !tail.trim() && a.acked > 0)
-        ackTurn(db, companion.id, a.id, a.endOffset, writer);
+      if (!a.acked) throw Error("model_unavailable");
+      // Newlines can be emitted as complete segments as well as trailing text.
+      // Only settle a silent suffix after all audible segments were acknowledged.
+      if (a.delivered < a.generated.length && !a.generated.slice(a.delivered).trim()) {
+        ackTurn(db, companion.id, a.id, a.generated.length, writer);
+      }
       signal.throwIfAborted();
       active = undefined;
       ctl("reply.end", { generation: a.generation });

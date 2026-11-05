@@ -184,3 +184,16 @@ it("offers remaining generated text after synthesis fails and delivers only on e
     status: "complete",
   });
 });
+
+it("keeps the call open after a reply ending with a line break", async () => {
+  vi.stubGlobal("fetch", async () => new Response(
+    "data: " + JSON.stringify({choices:[{delta:{content:"Hello.\n"}}]}) + "\n\ndata: [DONE]\n\n"
+  ));
+  external.hooks!.final("One.");
+  await endOf(1);
+  ack(1);
+  await vi.waitFor(() => expect(client.controls.some(e=>e.type === "reply.end")).toBe(true));
+  external.hooks!.final("Two.");
+  await endOf(1, 2);
+  expect(getHistory(db,"c").turns[0]).toMatchObject({userText:"One.",status:"complete"});
+});
