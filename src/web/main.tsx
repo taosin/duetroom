@@ -1,7 +1,8 @@
 import { createRoot } from "react-dom/client";
 import { useEffect, useState } from "react";
 import Login from "./Login";
-import { Brand, Language, type Lang } from "./ui";
+import Workspace from "./Workspace";
+import { type Lang } from "./ui";
 import "./base.css";
 
 function App() {
@@ -54,21 +55,6 @@ function App() {
     const r = await fetch("/api/session", { method: "DELETE" });
     if (r.ok || r.status === 401) setSession("out");
   }
-  return (
-    <div className="home">
-      <header className="topline">
-        <Brand />
-        <div className="controls">
-          <Language lang={lang} setLang={setLang} />
-          <button onClick={() => void logout()}>
-            {zh ? "退出" : "Sign out"}
-          </button>
-        </div>
-      </header>
-      <main>
-        <h1>{zh ? "我的房间" : "My room"}</h1>
-      </main>
-    </div>
-  );
+  return <Workspace lang={lang} setLang={setLang} logout={logout} />;
 }
 createRoot(document.getElementById("root")!).render(<App />);

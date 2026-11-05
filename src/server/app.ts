@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
+import { registerCompanions } from "./companions";
 import { serveWeb } from "./web";
 import { openDatabase } from "./db/open";
 import { bootstrap, registerAuth } from "./auth";
@@ -23,6 +24,7 @@ export function buildApp(config: {
   });
   app.register(cookie);
   registerAuth(app, db, origin);
+  registerCompanions(app, db);
   serveWeb(app);
   return app;
 }

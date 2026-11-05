@@ -1,0 +1,160 @@
+import { useEffect, useState } from "react";
+import { Brand, Language, type Lang } from "./ui";
+import type { Companion } from "../shared/companion";
+import Editor from "./companions/Editor";
+import "./workspace.css";
+
+function Portrait({ name, id }: { name: string; id: string }) {
+  return (
+    <span
+      className={"portrait tone" + (id.charCodeAt(0) % 4)}
+      aria-hidden="true"
+    >
+      {Array.from(name)[0]}
+    </span>
+  );
+}
+export default function Workspace({
+  lang,
+  setLang,
+  logout,
+}: {
+  lang: Lang;
+  setLang: (l: Lang) => void;
+  logout: () => void;
+}) {
+  const zh = lang === "zh",
+    [rows, setRows] = useState<Companion[]>([]),
+    [ready, loaded] = useState(false),
+    [failed, fail] = useState(false);
+  const [id, select] = useState(
+    () => localStorage.getItem("duet.companion") || "",
+  );
+  const [mode, edit] = useState<"new" | "edit" | null>(null);
+  const active = rows.find((v) => v.id === id) || rows[0];
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/companions")
+      .then(async (r) => {
+        if (!r.ok) throw Error();
+        const list = await r.json();
+        if (alive) setRows(list);
+      })
+      .catch(() => {
+        if (alive) fail(true);
+      })
+      .finally(() => {
+        if (alive) loaded(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (active) localStorage.setItem("duet.companion", active.id);
+  }, [active?.id]);
+  function saved(c: Companion) {
+    setRows((rs) =>
+      rs.some((r) => r.id === c.id)
+        ? rs.map((r) => (r.id === c.id ? c : r))
+        : [...rs, c],
+    );
+    select(c.id);
+    edit(null);
+  }
+  return (
+    <div className="studio">
+      <header className="studio-bar">
+        <Brand />
+        <div className="controls">
+          <Language lang={lang} setLang={setLang} />
+          <button className="quiet" onClick={logout}>
+            {zh ? "退出" : "Sign out"}
+          </button>
+        </div>
+      </header>
+      <div className="studio-columns">
+        <aside className="people">
+          <div className="topline">
+            <h2>{zh ? "我的伙伴" : "Companions"}</h2>
+            <button
+              className="add"
+              onClick={() => edit("new")}
+              title={zh ? "创建伙伴" : "New companion"}
+              aria-label={zh ? "创建伙伴" : "New companion"}
+            >
+              ＋
+            </button>
+          </div>
+          <nav aria-label={zh ? "切换伙伴" : "Choose companion"}>
+            {rows.map((c) => (
+              <button
+                className={"person" + (c.id === active?.id ? " selected" : "")}
+                key={c.id}
+                onClick={() => select(c.id)}
+                aria-pressed={c.id === active?.id}
+              >
+                <Portrait name={c.name} id={c.id} />
+                <span>{c.name}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+        <main className="room">
+          {!ready ? (
+            <p>{zh ? "正在打开…" : "Opening…"}</p>
+          ) : failed ? (
+            <p role="alert">
+              {zh
+                ? "无法读取角色，请刷新重试。"
+                : "Could not load companions. Refresh to retry."}
+            </p>
+          ) : active ? (
+            <>
+              <header className="room-bar">
+                <div className="identity">
+                  <Portrait name={active.name} id={active.id} />
+                  <h1>{active.name}</h1>
+                </div>
+                <button onClick={() => edit("edit")}>
+                  {zh ? "伙伴设置" : "Companion settings"}
+                </button>
+              </header>
+              <div className="room-welcome">
+                <img src="/room.svg" alt="" />
+                <h2>{active.name}</h2>
+                {active.persona && <p>{active.persona}</p>}
+              </div>
+            </>
+          ) : (
+            <div className="room-welcome">
+              <img src="/room.svg" alt="" />
+              <h1>{zh ? "认识你的第一位伙伴" : "Meet your first companion"}</h1>
+              <p>
+                {zh
+                  ? "为对方取个名字，选好你们聊天的语言。"
+                  : "Give them a name and choose the language you’ll speak together."}
+              </p>
+              <button className="primary" onClick={() => edit("new")}>
+                {zh ? "创建第一位伙伴" : "Create your first companion"}
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+      {mode && (
+        <Editor
+          key={mode + (active?.id || "")}
+          companion={mode === "edit" ? active : undefined}
+          lang={lang}
+          onClose={() => edit(null)}
+          onSave={saved}
+          onDelete={(deleted) => {
+            setRows((rs) => rs.filter((r) => r.id !== deleted));
+            edit(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}

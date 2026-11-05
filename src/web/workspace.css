@@ -1,0 +1,220 @@
+.studio {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 clamp(14px, 4vw, 62px) 24px;
+}
+.studio-bar {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.studio-columns {
+  display: grid;
+  grid-template-columns: minmax(200px, 24%) 1fr;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fffdf8;
+  min-height: calc(100svh - 110px);
+}
+.people {
+  padding: 26px 17px;
+  background: #eef0e7;
+  border-right: 1px solid var(--line);
+}
+.people h2 {
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  margin: 0;
+}
+.people nav {
+  display: grid;
+  gap: 6px;
+  margin-top: 24px;
+}
+.add {
+  font-size: 21px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+}
+.portrait {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: #c9d8c6;
+  color: #385848;
+  border-radius: 13px;
+  font:
+    600 22px Georgia,
+    serif;
+  width: 42px;
+  height: 42px;
+}
+.tone1 {
+  background: #ebccb2;
+  color: #6d4d33;
+}
+.tone2 {
+  background: #dcd6eb;
+  color: #615572;
+}
+.tone3 {
+  background: #eacca2;
+  color: #796032;
+}
+.person {
+  background: transparent;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  min-width: 0;
+}
+.person span:last-child,
+.identity h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person.selected {
+  background: #fffdf8;
+  border-color: var(--line);
+}
+.room {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.room-bar {
+  padding: 18px clamp(14px, 3vw, 34px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.identity h1 {
+  font:
+    600 1.4rem Georgia,
+    serif;
+  margin: 0;
+}
+.room-bar button {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.room-welcome {
+  margin: auto;
+  text-align: center;
+  padding: 32px;
+  max-width: 480px;
+  overflow-wrap: anywhere;
+}
+.room-welcome img {
+  width: min(240px, 85%);
+  height: 185px;
+  object-fit: cover;
+  object-position: center 68%;
+  border-radius: 100px 100px 12px 12px;
+  margin: 10px 0 28px;
+}
+.room-welcome p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.editor {
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  color: var(--ink);
+  background: var(--paper);
+  padding: 26px;
+  max-width: min(440px, 92vw);
+  width: 100%;
+  max-height: 90svh;
+}
+.editor::backdrop {
+  background: #173a3066;
+}
+.editor h2 {
+  margin: 0;
+  font:
+    600 1.6rem Georgia,
+    serif;
+}
+.editor form {
+  margin-top: 24px;
+  display: grid;
+  gap: 18px;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.danger {
+  color: #9e4535;
+}
+.actions .danger:first-child {
+  margin-right: auto;
+}
+.close {
+  font-size: 23px;
+}
+@media (max-width: 720px) {
+  .studio {
+    padding: 0 10px 10px;
+  }
+  .studio-bar {
+    height: 62px;
+    padding: 0 5px;
+  }
+  .studio-columns {
+    grid-template-columns: 1fr;
+    min-height: calc(100svh - 78px);
+    display: flex;
+    flex-direction: column;
+  }
+  .people {
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 10px 14px;
+  }
+  .people nav {
+    display: flex;
+    overflow-x: auto;
+    margin-top: 8px;
+  }
+  .people nav:empty {
+    margin: 0;
+  }
+  .person {
+    padding: 4px 8px;
+  }
+  .person .portrait {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    font-size: 15px;
+  }
+  .room {
+    flex: 1;
+  }
+  .room-bar {
+    padding: 10px 13px;
+  }
+  .room-bar .portrait {
+    display: none;
+  }
+  .room-welcome {
+    padding: 20px;
+  }
+}
