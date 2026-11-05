@@ -19,6 +19,9 @@ type Active = {
   acked: number;
   endOffset: number;
   readyForAck: boolean;
+  generated: string;
+  delivered: number;
+  fallback?: "pending" | "available" | "offered";
 };
 function errorCode(error: unknown) {
   const code =
@@ -73,6 +76,12 @@ export function serveCall(
     if (a.id && !writer.signal.aborted)
       interruptTurn(db, companion.id, a.id, writer);
   };
+  const interrupt = () => {
+    if (!active) return;
+    stopTurn();
+    ctl("interrupted", { generation: ++generation });
+    ctl("history");
+  };
   const finish = (reason?: string) => {
     if (closed) return;
     if (reason) ctl("error", { code: reason });
@@ -110,6 +119,8 @@ export function serveCall(
       acked: 0,
       endOffset: 0,
       readyForAck: false,
+      generated: "",
+      delivered: 0,
     };
     active = a;
     const signal = a.controller.signal;
@@ -123,6 +134,7 @@ export function serveCall(
       if (!sentence.trim()) return;
       a.segment++;
       const expression = expressionForTurn(db, a.id, voice.styles);
+      const initialSequence = a.sent;
       for await (const pcm of synthesize(sentence, voice, expression, signal)) {
         const deadline = Date.now() + 8000;
         while (a.sent - a.consumed >= 6) {
@@ -134,12 +146,25 @@ export function serveCall(
         socket.send(frame(2, a.generation, a.segment, ++a.sent, pcm));
       }
       signal.throwIfAborted();
+      if (a.sent === initialSequence) throw Error("synthesis_failed");
       a.readyForAck = true;
       ctl("segment.end", { generation: a.generation, segment: a.segment });
       const deadline = Date.now() + 15000;
       while (a.acked < a.segment) {
         if (Date.now() > deadline) throw Error("network");
         await wait(16, undefined, { signal });
+      }
+    }
+    async function deliver(sentence: string) {
+      if (a.fallback) return;
+      try {
+        await speak(sentence);
+      } catch (error) {
+        signal.throwIfAborted();
+        if (errorCode(error) !== "synthesis_failed") throw error;
+        a.fallback = "pending";
+        a.readyForAck = false;
+        ctl("synthesis.failed", { generation: a.generation });
       }
     }
     try {
@@ -151,9 +176,10 @@ export function serveCall(
         signal,
         async (delta, id) => {
           a.id = id;
+          a.generated += delta;
           const split = splitSpeech(tail + delta);
           tail = split.tail;
-          for (const sentence of split.complete) await speak(sentence);
+          for (const sentence of split.complete) await deliver(sentence);
         },
         {
           writer,
@@ -165,7 +191,13 @@ export function serveCall(
           },
         },
       );
-      await speak(tail);
+      await deliver(tail);
+      signal.throwIfAborted();
+      if (a.fallback) {
+        a.fallback = "available";
+        ctl("reveal.available", { generation: a.generation });
+        return;
+      }
       if (tail && !tail.trim() && a.acked > 0)
         ackTurn(db, companion.id, a.id, a.endOffset, writer);
       signal.throwIfAborted();
@@ -201,10 +233,12 @@ export function serveCall(
     voice = selected;
     stream = recognize(companion.locale, {
       partial: (text) => {
+        if (/[^\s\p{P}]/u.test(text)) interrupt();
         endpoint.partial();
         ctl("caption", { text: text.slice(0, 4000) });
       },
       final: (text) => {
+        if (/[^\s\p{P}]/u.test(text)) interrupt();
         endpoint.final(text);
         if (text) ctl("caption", { text: text.slice(0, 4000) });
       },
@@ -262,6 +296,21 @@ export function serveCall(
       }
       const a = active;
       if (!a || msg.generation !== a.generation) return;
+      if (msg.type === "interrupt") return interrupt();
+      if (msg.type === "reveal.request" && a.fallback === "available") {
+        a.fallback = "offered";
+        return ctl("reveal.text", {
+          generation: a.generation,
+          text: a.generated.slice(a.delivered),
+        });
+      }
+      if (msg.type === "reveal.displayed" && a.fallback === "offered") {
+        if (!ackTurn(db, companion.id, a.id, a.generated.length, writer))
+          return finish("expired");
+        active = undefined;
+        ctl("reply.end", { generation: a.generation });
+        return ctl("history");
+      }
       if (
         msg.type === "consumed" &&
         msg.sequence === a.consumed + 1 &&
@@ -279,6 +328,7 @@ export function serveCall(
           return finish("expired");
         a.readyForAck = false;
         a.acked++;
+        a.delivered = a.endOffset;
         ctl("history");
       }
     } catch {

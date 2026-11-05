@@ -15,6 +15,20 @@ export function openCall(companionId: string, hooks: Hooks) {
   let sequence = 0;
   let downSequence = 0;
   let lastVoice = 0;
+  let lastPlayed = 0;
+  const publish = (state: string, audioTime = context?.currentTime) => {
+    window.dispatchEvent(
+      new CustomEvent("duetroom:call", {
+        detail: { companionId, state, generation, audioTime },
+      }),
+    );
+  };
+  function resetAudio(g: number) {
+    generation = g;
+    downSequence = 0;
+    lastPlayed = 0;
+    worklet?.port.postMessage({ type: "reset", generation: g });
+  }
   let receivedAt = Date.now();
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const send = (type: string, fields: Record<string, unknown> = {}) => {
@@ -39,6 +53,7 @@ export function openCall(companionId: string, hooks: Hooks) {
       void context.close().catch(() => {});
     send("call.end");
     socket?.close();
+    publish("ended");
     hooks.ended(code);
   }
   async function connect() {
@@ -84,17 +99,14 @@ export function openCall(companionId: string, hooks: Hooks) {
       if (data.type === "input") {
         if (socket.bufferedAmount > 32000) return close("network");
         const samples = data.samples as Int16Array;
-        let energy = 0;
-        for (const sample of samples) energy += sample * sample;
-        if (
-          Math.sqrt(energy / samples.length) > 780 &&
-          Date.now() - lastVoice >= 50
-        ) {
+        if (data.voiced && Date.now() - lastVoice >= 50) {
           lastVoice = Date.now();
           send("voice");
         }
         socket.send(frame(1, 0, 0, ++sequence, new Uint8Array(samples.buffer)));
       } else if (data.generation === generation) {
+        if (data.type === "speaking" || data.type === "listening")
+          publish(data.type, data.at);
         if (data.type === "consumed")
           send("consumed", { generation, sequence: data.sequence });
         if (data.type === "played") {
@@ -119,8 +131,10 @@ export function openCall(companionId: string, hooks: Hooks) {
                 );
           const timer = setTimeout(() => {
             timers.delete(timer);
-            if (!closed && generation === g && audio.state === "running")
+            if (!closed && generation === g && audio.state === "running") {
+              lastPlayed = data.segment;
               send("ack", { generation: g, segment: data.segment });
+            }
           }, Math.ceil(delay));
           timers.add(timer);
         }
@@ -168,11 +182,18 @@ export function openCall(companionId: string, hooks: Hooks) {
         const msg = JSON.parse(data);
         if (msg.type === "ping") return send("pong");
         if (msg.type === "error") return close(msg.code);
-        if (msg.type === "ready") ready = true;
-        if (msg.type === "reply") {
-          generation = msg.generation;
-          downSequence = 0;
+        if (msg.type === "ready") {
+          ready = true;
+          publish("listening");
+        }
+        if (msg.type === "interrupted") {
+          resetAudio(msg.generation);
+          publish("interrupted");
+        }
+        if (msg.type === "synthesis.failed")
           worklet!.port.postMessage({ type: "reset", generation });
+        if (msg.type === "reply") {
+          resetAudio(msg.generation);
         }
         if (msg.type === "segment.end" && msg.generation === generation)
           worklet!.port.postMessage({
@@ -197,5 +218,17 @@ export function openCall(companionId: string, hooks: Hooks) {
           : "device",
     ),
   );
-  return { close };
+  return {
+    close,
+    interrupt: () => {
+      if (!ready || closed || generation <= 0) return;
+      send("interrupt", { generation, lastPlayed });
+      resetAudio(-1);
+      publish("interrupted");
+    },
+    reveal: () => send("reveal.request", { generation }),
+    displayed: (g: number) => {
+      if (g === generation) send("reveal.displayed", { generation });
+    },
+  };
 }

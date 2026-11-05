@@ -140,3 +140,47 @@ it("drops the connection on history deletion and ignores subsequent playback", a
   expect(client.readyState).toBe(3);
   expect(getHistory(db, "c").turns).toHaveLength(0);
 });
+
+it("cancels synthesis on an interim transcript, retains the new utterance and fences stale receipts", async () => {
+  external.hooks!.final("First turn.");
+  await endOf(1);
+  ack(1);
+  await endOf(2);
+  external.hooks!.partial("Actually");
+  expect(client.controls.some((e) => e.type === "interrupted")).toBe(true);
+  external.hooks!.final("Actually, let me try.");
+  await endOf(1, 3);
+  ack(2, 1);
+  const turns = getHistory(db, "c").turns;
+  expect(turns.find((t) => t.userText === "First turn.")).toMatchObject({
+    status: "interrupted",
+    assistantText: "First.",
+  });
+  expect(
+    turns.find((t) => t.userText === "Actually, let me try."),
+  ).toMatchObject({ assistantText: "" });
+});
+it("offers remaining generated text after synthesis fails and delivers only on explicit display", async () => {
+  external.scenario = "fail";
+  external.hooks!.final("Hello.");
+  await endOf(1);
+  ack(1);
+  await vi.waitFor(() =>
+    expect(client.controls.some((e) => e.type === "reveal.available")).toBe(
+      true,
+    ),
+  );
+  expect(getHistory(db, "c").turns[0].assistantText).toBe("First.");
+  client.command("reveal.displayed", { generation: 1 });
+  expect(getHistory(db, "c").turns[0].assistantText).toBe("First.");
+  client.command("reveal.request", { generation: 1 });
+  expect(client.controls.at(-1)).toMatchObject({
+    type: "reveal.text",
+    text: " Second.",
+  });
+  client.command("reveal.displayed", { generation: 1 });
+  expect(getHistory(db, "c").turns[0]).toMatchObject({
+    assistantText: phrase,
+    status: "complete",
+  });
+});

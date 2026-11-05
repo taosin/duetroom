@@ -6,6 +6,8 @@ class DuetAudio extends AudioWorkletProcessor {
     this.queue = [];
     this.generation = 0;
     this.cursor = 0;
+    this.hold = 0;
+    this.speaking = false;
     this.capture = new Int16Array(320);
     this.count = 0;
     this.phase = 0;
@@ -14,6 +16,8 @@ class DuetAudio extends AudioWorkletProcessor {
       if (data.type === "reset") {
         this.generation = data.generation;
         this.queue = [];
+        this.hold = 0;
+        this.speaking = false;
         this.cursor = 0;
       } else if (
         data.generation === this.generation &&
@@ -38,18 +42,35 @@ class DuetAudio extends AudioWorkletProcessor {
       this.phase = width - used;
       this.sum = value * this.phase;
       if (this.count === 320) {
-        this.port.postMessage({ type: "input", samples: this.capture }, [
-          this.capture.buffer,
-        ]);
+        let energy = 0;
+        for (const sample of this.capture) energy += sample * sample;
+        const voiced = Math.sqrt(energy / 320) > 780;
+        if (voiced && this.queue.length)
+          this.hold = Math.ceil(0.35 * sampleRate);
+        this.port.postMessage(
+          { type: "input", samples: this.capture, voiced },
+          [this.capture.buffer],
+        );
         this.capture = new Int16Array(320);
         this.count = 0;
       }
     }
   }
+  setSpeaking(value, offset) {
+    this.speaking = value;
+    this.port.postMessage({
+      type: value ? "speaking" : "listening",
+      generation: this.generation,
+      at: (currentFrame + offset) / sampleRate,
+    });
+  }
   process(inputs, outputs) {
     if (inputs[0]?.[0]) this.captureInput(inputs[0][0]);
     const output = outputs[0][0];
-    for (let i = 0; i < output.length; i++) {
+    const skip = Math.min(this.hold, output.length);
+    this.hold -= skip;
+    if (skip && this.speaking) this.setSpeaking(false, 0);
+    for (let i = skip; i < output.length; i++) {
       while (this.queue.length && this.queue[0].type === "end") {
         const marker = this.queue.shift();
         this.port.postMessage({
@@ -60,7 +81,11 @@ class DuetAudio extends AudioWorkletProcessor {
         });
       }
       const chunk = this.queue[0];
-      if (!chunk) break;
+      if (!chunk) {
+        if (this.speaking) this.setSpeaking(false, i);
+        break;
+      }
+      if (!this.speaking) this.setSpeaking(true, i);
       const index = Math.floor(this.cursor);
       const fraction = this.cursor - index;
       const a = chunk.samples[index];

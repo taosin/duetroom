@@ -3,6 +3,8 @@ import { openCall } from "./device";
 
 const copy = {
   en: {
+    interrupt: "Interrupt",
+    reveal: "Show remaining text",
     call: "Voice call",
     connect: "Start call",
     cancel: "Cancel",
@@ -34,6 +36,8 @@ const copy = {
     call_failed: "The call could not continue.",
   },
   zh: {
+    interrupt: "打断",
+    reveal: "显示剩余文字",
     call: "语音通话",
     connect: "接通",
     cancel: "取消",
@@ -84,6 +88,19 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
   const [model, setModel] = useState("");
   const [error, setError] = useState("call_failed");
   const [caption, setCaption] = useState("");
+  const [offer, setOffer] = useState(false);
+  const [remaining, setRemaining] = useState<{
+    text: string;
+    generation: number;
+  }>();
+  useEffect(() => {
+    if (!remaining) return;
+    const call = current.current;
+    let tick = requestAnimationFrame(() => {
+      tick = requestAnimationFrame(() => call?.displayed(remaining.generation));
+    });
+    return () => cancelAnimationFrame(tick);
+  }, [remaining]);
   const current = useRef<ReturnType<typeof openCall> | undefined>(undefined);
   const handle = useRef(0);
   const history = useRef(onHistoryChange);
@@ -133,12 +150,23 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
   }
   function connect() {
     const token = ++handle.current;
+    setOffer(false);
+    setRemaining(undefined);
     setState("connecting");
     current.current = openCall(companion.id, {
       event: (e) => {
         if (handle.current !== token) return;
         if (e.type === "ready" || e.type === "reply.end") setState("listening");
-        if (e.type === "reply") setState("replying");
+        if (e.type === "interrupted" || e.type === "reply") {
+          setOffer(false);
+          setRemaining(undefined);
+          setState(e.type === "reply" ? "replying" : "listening");
+        }
+        if (e.type === "reveal.available") setOffer(true);
+        if (e.type === "reveal.text" && e.text && e.generation !== undefined) {
+          setOffer(false);
+          setRemaining({ text: e.text, generation: e.generation });
+        }
         if (e.type === "caption" || e.type === "reply")
           setCaption(e.text || "");
         if (e.type === "history") history.current();
@@ -197,6 +225,17 @@ export default function CallPanel({ companion, lang, onHistoryChange }: Props) {
             {labels[state as "connecting" | "listening" | "replying"]}
           </span>
           {caption && <p>{caption}</p>}
+          {remaining && <p>{remaining.text}</p>}
+          {offer && (
+            <button type="button" onClick={() => current.current?.reveal()}>
+              {labels.reveal}
+            </button>
+          )}
+          {state === "replying" && (
+            <button type="button" onClick={() => current.current?.interrupt()}>
+              {labels.interrupt}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
