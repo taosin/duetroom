@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
 import { registerChat } from "./chat/routes";
+import { moodHooks, registerMood } from "./persona/mood";
 import { registerMemories, memoryContext } from "./persona/memories";
 import { configureChat, cancelWriter } from "./chat/turns";
 import cookie from "@fastify/cookie";
@@ -28,9 +29,22 @@ export function buildApp(config: {
   });
   app.register(cookie);
   registerAuth(app, db, origin);
-  app.register(websocket, { options: { maxPayload: 32_000, perMessageDeflate: false } });
+  app.register(websocket, {
+    options: { maxPayload: 32_000, perMessageDeflate: false },
+  });
   registerCompanions(app, db, (id) => cancelWriter(db, id));
-  app.register(async (scope) => { registerChat(scope, db); registerMemories(scope,db); configureChat(db,{context:memoryContext}); });
+  app.register(async (scope) => {
+    registerChat(scope, db);
+    registerMemories(scope, db);
+    registerMood(db);
+    configureChat(db, {
+      ...moodHooks,
+      context: (db, id, input) =>
+        [moodHooks.context(db, id), memoryContext(db, id, input)]
+          .filter(Boolean)
+          .join("\n"),
+    });
+  });
   serveWeb(app);
   return app;
 }
