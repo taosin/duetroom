@@ -97,6 +97,12 @@ export function serveCall(
     writer.release();
     socket.close(1000);
   };
+  function canContinue() {
+    if (closed) return false;
+    if (authorized()) return true;
+    finish("expired");
+    return false;
+  }
   const revoked = () => finish("expired");
   const heartbeat = setInterval(() => {
     if (!authorized()) finish("expired");
@@ -109,7 +115,7 @@ export function serveCall(
   writer.signal.addEventListener("abort", revoked, { once: true });
 
   async function reply(text: string) {
-    if (closed || active) return;
+    if (!canContinue() || active) return;
     const a: Active = {
       generation: ++generation,
       controller: new AbortController(),
@@ -129,7 +135,7 @@ export function serveCall(
     ctl("reply", { generation, text });
     async function speak(sentence: string) {
       signal.throwIfAborted();
-      if (!sentence.length) return;
+      if (!canContinue() || !sentence.length) return;
       a.endOffset += sentence.length;
       // A whitespace-only model suffix does not constitute an audible segment.
       if (!sentence.trim()) return;
@@ -143,7 +149,8 @@ export function serveCall(
           await wait(16, undefined, { signal });
         }
         signal.throwIfAborted();
-        if (closed || socket.bufferedAmount > 50000) throw Error("network");
+        if (!canContinue()) return;
+        if (socket.bufferedAmount > 50000) throw Error("network");
         socket.send(frame(2, a.generation, a.segment, ++a.sent, pcm));
       }
       signal.throwIfAborted();
@@ -176,6 +183,7 @@ export function serveCall(
         randomUUID(),
         signal,
         async (delta, id) => {
+          if (!canContinue()) return;
           a.id = id;
           a.generated += delta;
           const split = splitSpeech(tail + delta);
@@ -192,6 +200,7 @@ export function serveCall(
           },
         },
       );
+      if (!canContinue()) return;
       await deliver(tail);
       signal.throwIfAborted();
       if (a.fallback) {
@@ -230,7 +239,7 @@ export function serveCall(
     if (typeof msg.timeZone === "string" && msg.timeZone.length <= 64)
       timeZone = msg.timeZone;
     const catalog = await voices();
-    if (closed) return;
+    if (!canContinue()) return;
     const selected = companion.voice
       ? catalog.find((v) => v.id === companion.voice)
       : catalog.find((v) => v.locale === companion.locale);
@@ -238,11 +247,13 @@ export function serveCall(
     voice = selected;
     stream = recognize(companion.locale, {
       partial: (text) => {
+        if (!canContinue()) return;
         if (/[^\s\p{P}]/u.test(text)) interrupt();
         endpoint.partial();
         ctl("caption", { text: text.slice(0, 4000) });
       },
       final: (text) => {
+        if (!canContinue()) return;
         if (/[^\s\p{P}]/u.test(text)) interrupt();
         endpoint.final(text);
         if (text) ctl("caption", { text: text.slice(0, 4000) });
@@ -250,11 +261,12 @@ export function serveCall(
       failed: () => finish("recognition_failed"),
     });
     await stream.ready;
+    if (!canContinue()) return;
     clearTimeout(setup);
     ctl("ready", { version: 1, inputRate: 16000, outputRate: 24000 });
   }
   socket.on("message", (raw, binary) => {
-    if (closed) return;
+    if (!canContinue()) return;
     try {
       const bytes = Array.isArray(raw)
         ? Buffer.concat(raw)

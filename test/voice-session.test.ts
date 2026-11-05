@@ -51,8 +51,10 @@ class Client extends EventEmitter {
 }
 let db: Database.Database;
 let client: Client;
+let access = true;
 const phrase = "First. Second.";
 beforeEach(async () => {
+  access = true;
   external.scenario = "ok";
   db = new Database(":memory:");
   db.exec(
@@ -76,7 +78,7 @@ beforeEach(async () => {
     client as unknown as WebSocket,
     db,
     { id: "c", locale: "en-US", voice: "test" },
-    () => true,
+    () => access,
   );
   client.command("call.start", {
     version: 1,
@@ -196,4 +198,20 @@ it("keeps the call open after a reply ending with a line break", async () => {
   external.hooks!.final("Two.");
   await endOf(1, 2);
   expect(getHistory(db,"c").turns[0]).toMatchObject({userText:"One.",status:"complete"});
+});
+
+it("rejects audio and transcripts immediately after session revocation", async () => {
+  access = false;
+  external.hooks!.partial("after sign-out");
+  external.hooks!.final("after sign-out");
+  expect(client.readyState).toBe(3);
+  expect(getHistory(db, "c").turns).toEqual([]);
+});
+it("rejects a playback receipt after session revocation", async () => {
+  external.hooks!.final("Before logout.");
+  await endOf(1);
+  access = false;
+  ack(1);
+  expect(client.readyState).toBe(3);
+  expect(getHistory(db,"c").turns[0].assistantText).toBe("");
 });
