@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
+import { registerCall } from "./call/routes";
 import { registerChat } from "./chat/routes";
 import { moodHooks, registerMood } from "./persona/mood";
 import { registerMemories, memoryContext } from "./persona/memories";
@@ -35,6 +36,7 @@ export function buildApp(config: {
   registerCompanions(app, db, (id) => cancelWriter(db, id));
   app.register(async (scope) => {
     registerChat(scope, db);
+    registerCall(scope,db);
     registerMemories(scope, db);
     registerMood(db);
     configureChat(db, {

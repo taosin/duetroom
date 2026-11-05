@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Brand, Language, type Lang } from "./ui";
 import type { Companion } from "../shared/companion";
 import { Memories, Remember } from "./persona/Memories";
+import CallPanel from "./call/CallPanel";
 import Conversation from "./chat/Conversation";
 import Editor from "./companions/Editor";
 import "./workspace.css";
@@ -118,11 +119,29 @@ export default function Workspace({
                   <Portrait name={active.name} id={active.id} />
                   <h1>{active.name}</h1>
                 </div>
-                <div className="controls"><Memories key={active.id} companionId={active.id} locale={lang}/><button onClick={() => edit("edit")}>
-                  {zh ? "伙伴设置" : "Companion settings"}
-                </button></div>
+                <div className="controls">
+                  <Memories
+                    key={active.id}
+                    companionId={active.id}
+                    locale={lang}
+                  />
+                  <button onClick={() => edit("edit")}>
+                    {zh ? "伙伴设置" : "Companion settings"}
+                  </button>
+                </div>
               </header>
-              <Conversation companion={active} lang={lang} renderMessageAction={source=><Remember companionId={active.id} locale={lang} source={source}/>}/>
+              <Conversation
+                companion={active}
+                lang={lang}
+                renderCall={({refresh,busy})=>busy?null:<CallPanel companion={active} lang={lang} onHistoryChange={refresh}/>}
+                renderMessageAction={(source) => (
+                  <Remember
+                    companionId={active.id}
+                    locale={lang}
+                    source={source}
+                  />
+                )}
+              />
             </>
           ) : (
             <div className="room-welcome">
