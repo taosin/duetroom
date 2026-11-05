@@ -1,0 +1,9 @@
+services:
+  duetroom:
+    environment:
+      DUET_OWNER_PASSWORD_FILE: /run/secrets/owner
+    secrets:
+      - owner
+secrets:
+  owner:
+    file: ${DUET_OWNER_PASSWORD_FILE:?Set the absolute path to the initial owner password file}

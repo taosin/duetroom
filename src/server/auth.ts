@@ -19,7 +19,7 @@ export function bootstrap(db: Database.Database, password?: string) {
   if (db.prepare("SELECT id FROM owner WHERE id = 1").get()) return;
   if (!password || password.length < 12 || password.length > 512)
     throw new Error(
-      "Set DUET_OWNER_PASSWORD_FILE to a file containing a password of 12–512 characters.",
+      "Set DUET_OWNER_PASSWORD_FILE to a file containing a password of 12–512 characters. For a new Docker installation, start with: docker compose -f compose.yaml -f compose.bootstrap.yaml up -d",
     );
   const salt = randomBytes(16).toString("hex");
   db.prepare("INSERT INTO owner VALUES (1, ?, ?)").run(
