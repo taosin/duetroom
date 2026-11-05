@@ -5,6 +5,9 @@ services:
       - "127.0.0.1:3647:3647"
     environment:
       DUET_PUBLIC_ORIGIN: ${DUET_PUBLIC_ORIGIN:-http://localhost:3647}
+      DUET_MODEL_BASE_URL: ${DUET_MODEL_BASE_URL:-}
+      DUET_MODEL_NAME: ${DUET_MODEL_NAME:-}
+      DUET_MODEL_API_KEY: ${DUET_MODEL_API_KEY:-}
       DUET_OWNER_PASSWORD_FILE: /run/secrets/owner
     secrets:
       - owner

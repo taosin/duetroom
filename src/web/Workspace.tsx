@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Brand, Language, type Lang } from "./ui";
 import type { Companion } from "../shared/companion";
+import Conversation from "./chat/Conversation";
 import Editor from "./companions/Editor";
 import "./workspace.css";
 
@@ -120,11 +121,7 @@ export default function Workspace({
                   {zh ? "伙伴设置" : "Companion settings"}
                 </button>
               </header>
-              <div className="room-welcome">
-                <img src="/room.svg" alt="" />
-                <h2>{active.name}</h2>
-                {active.persona && <p>{active.persona}</p>}
-              </div>
+              <Conversation companion={active} lang={lang}/>
             </>
           ) : (
             <div className="room-welcome">

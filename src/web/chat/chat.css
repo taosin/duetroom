@@ -1,0 +1,51 @@
+.duet-chat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid var(--line,#d6dbcf);
+  border-radius: 18px;
+  background: #fffef9;
+  color: var(--ink,#223a32);
+}
+.duet-chatbar {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  min-height:60px; padding:10px clamp(14px,3vw,28px); border-bottom:1px solid #e5e7dd;
+}
+.duet-chatbar h2 {margin:0;font-size:1.06rem;font-weight:650}
+.duet-chattools {display:flex;align-items:center;gap:8px;position:relative}
+.duet-more {border:0;background:transparent;padding:8px;min-width:40px;min-height:40px;letter-spacing:2px;color:var(--muted)}
+.duet-options {position:absolute;z-index:3;right:0;top:100%;width:max-content;max-width:86vw;padding:4px;background:#fffdf7;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 25px #263d2d15}
+.duet-options button {display:block;width:100%;text-align:start;border:none;background:none;padding:10px 14px}
+.duet-options button:hover:not(:disabled){background:#f1f3e9}
+.duet-history {height:clamp(300px,49dvh,640px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:12px clamp(14px,3vw,28px) 18px}
+.duet-empty {height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow-wrap:anywhere}
+.duet-empty h3 {margin:12px 0 6px;font-family:Georgia,'Songti SC',serif;font-size:1.5rem;font-weight:500}
+.duet-empty p,.duet-loading {color:var(--muted);font-size:.93rem}
+.duet-date {display:flex;align-items:center;gap:12px;font-size:.72rem;color:var(--muted);margin:12px 0}
+.duet-date::before,.duet-date::after {content:'';flex:1;height:1px;background:#e6e8df}
+.duet-turn {display:flex;flex-direction:column;align-items:stretch}
+.duet-message {display:flex;flex-direction:column;align-items:flex-start;max-width:min(84%,45rem);align-self:flex-start}
+.duet-message p {margin:0;padding:10px 14px;background:#f0f2e9;border-radius:2px 14px 14px 14px;line-height:1.65;overflow-wrap:anywhere;white-space:pre-wrap}
+.duet-message.user {align-self:flex-end;align-items:flex-end}
+.duet-message.user p {border-radius:14px 2px 14px 14px;background:#deebe1;color:#224736}
+.duet-meta {color:var(--muted);font-size:.73rem;margin:12px 0 5px;overflow-wrap:anywhere}
+.duet-meta.user {text-align:end}
+.duet-status,.duet-older {color:var(--muted);font-size:.8rem}
+.duet-status {padding:5px 0}
+.duet-status button,.duet-older {background:transparent;border:0;color:var(--green);text-decoration:underline;text-underline-offset:3px}
+.duet-older {display:block;margin:auto}
+.duet-composer {display:flex;align-items:flex-end;gap:10px;margin:0 clamp(10px,2vw,22px) 14px;padding:8px 10px 8px 5px;border:1px solid #c8d2c5;border-radius:13px;background:#fff}
+.duet-composer:focus-within {border-color:#709782;box-shadow:0 0 0 2px #9fb9a72b}
+.duet-composer textarea {flex:1;min-width:0;padding:5px 9px;border:0;background:transparent;line-height:1.55;resize:none;outline:none;min-height:44px;max-height:120px;font-size:1rem}
+.duet-composer textarea:focus-visible {outline:none}
+.duet-send {flex:none;display:grid;place-items:center;color:white;background:var(--green,#1c5145);border:0;border-radius:50%;width:40px;height:40px;padding:0}
+.duet-notice {display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin:12px 14px 0;border-inline-start:3px solid #b67c4e;padding:8px 11px;background:#f7f1e6;color:#654c30;font-size:.82rem;line-height:1.55;overflow-wrap:anywhere}
+.duet-notice button {padding:3px 7px;font-size:inherit}
+@media(max-width:600px) {
+  .duet-history {height:clamp(260px,46dvh,540px);padding:10px 12px 15px}
+  .duet-chat {border-radius:14px}
+  .duet-message {max-width:91%}
+  .duet-chatbar {padding:9px 12px}
+}
