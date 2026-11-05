@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Brand, Language, type Lang } from "./ui";
 import type { Companion } from "../shared/companion";
+import { Memories, Remember } from "./persona/Memories";
 import Conversation from "./chat/Conversation";
 import Editor from "./companions/Editor";
 import "./workspace.css";
@@ -117,11 +118,11 @@ export default function Workspace({
                   <Portrait name={active.name} id={active.id} />
                   <h1>{active.name}</h1>
                 </div>
-                <button onClick={() => edit("edit")}>
+                <div className="controls"><Memories key={active.id} companionId={active.id} locale={lang}/><button onClick={() => edit("edit")}>
                   {zh ? "伙伴设置" : "Companion settings"}
-                </button>
+                </button></div>
               </header>
-              <Conversation companion={active} lang={lang}/>
+              <Conversation companion={active} lang={lang} renderMessageAction={source=><Remember companionId={active.id} locale={lang} source={source}/>}/>
             </>
           ) : (
             <div className="room-welcome">
