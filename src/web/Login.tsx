@@ -1,3 +1,7 @@
+import { Alert, AlertDescription } from "./components/ui/alert";
+import { Label } from "./components/ui/label";
+import { Input } from "./components/ui/input";
+import { Button } from "./components/ui/button";
 import { useState, type FormEvent } from "react";
 import { Brand, Language, type Lang } from "./ui";
 
@@ -52,11 +56,11 @@ export default function Login({
               : "Use your owner password to enter your room."}
           </p>
           <form onSubmit={submit}>
-            <label htmlFor="password">
+            <Label htmlFor="password">
               {zh ? "主人口令" : "Owner password"}
-            </label>
+            </Label>
             <div className="secret">
-              <input
+              <Input
                 autoComplete="current-password"
                 id="password"
                 type={visible ? "text" : "password"}
@@ -65,32 +69,34 @@ export default function Login({
                 maxLength={512}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <button
+              <Button
+                variant="ghost"
                 type="button"
-                className="quiet"
                 onClick={() => show(!visible)}
               >
                 {visible ? (zh ? "隐藏" : "Hide") : zh ? "显示" : "Show"}
-              </button>
+              </Button>
             </div>
             {error > 0 && (
-              <span role="alert" className="feedback">
-                {error === 401
-                  ? zh
-                    ? "口令不正确，请重试。"
-                    : "Incorrect password. Try again."
-                  : error === 429
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {error === 401
                     ? zh
-                      ? "请稍后再试。"
-                      : "Please try again in a minute."
-                    : zh
-                      ? "无法登录，请检查服务地址。"
-                      : "Could not sign in. Check the service address."}
-              </span>
+                      ? "口令不正确，请重试。"
+                      : "Incorrect password. Try again."
+                    : error === 429
+                      ? zh
+                        ? "请稍后再试。"
+                        : "Please try again in a minute."
+                      : zh
+                        ? "无法登录，请检查服务地址。"
+                        : "Could not sign in. Check the service address."}
+                </AlertDescription>
+              </Alert>
             )}
-            <button className="primary" disabled={busy}>
+            <Button type="submit" variant="default" disabled={busy}>
               {busy ? "…" : zh ? "进入房间　→" : "Enter room　→"}
-            </button>
+            </Button>
           </form>
         </div>
         <span className="selfhost">

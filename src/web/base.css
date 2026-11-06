@@ -1,3 +1,31 @@
+@import "tailwindcss" source(".");
+@import "tw-animate-css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
 :root {
   font-family:
     Inter,
@@ -6,86 +34,88 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color: #223a32;
-  background: #f8f7f1;
   font-synthesis: none;
   color-scheme: light;
-  --ink: #223a32;
-  --muted: #65766c;
-  --line: #d6dbcf;
-  --paper: #f8f7f1;
-  --green: #1c5145;
+  --background: #f8f7f1;
+  --foreground: #223a32;
+  --card: #fffdf8;
+  --card-foreground: #223a32;
+  --popover: #fffdf8;
+  --popover-foreground: #223a32;
+  --primary: #1c5145;
+  --primary-foreground: #ffffff;
+  --secondary: #eef0e7;
+  --secondary-foreground: #223a32;
+  --muted: #eef0e7;
+  --muted-foreground: #65766c;
+  --accent: #e5eddf;
+  --accent-foreground: #223a32;
+  --destructive: #9e4535;
+  --border: #d6dbcf;
+  --input: #c8d2c5;
+  --ring: #a46b3f;
+  --radius: 0.7rem;
+  --ink: var(--foreground);
+  --line: var(--border);
+  --paper: var(--background);
+  --green: var(--primary);
   --clay: #ae603d;
 }
-* {
-  box-sizing: border-box;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+  }
+  button:not(:disabled),
+  [role="menuitem"]:not([data-disabled]) {
+    cursor: pointer;
+  }
+  a {
+    color: var(--primary);
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.035em;
+  }
+  p {
+    margin: 0 0 1rem;
+  }
+  textarea {
+    resize: vertical;
+  }
 }
-body {
-  margin: 0;
-}
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-button {
-  cursor: pointer;
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-a {
-  color: var(--green);
-}
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 3px solid #d09361;
-  outline-offset: 3px;
-}
-button,
-input,
-select,
-textarea {
-  border: 1px solid var(--line);
-  border-radius: 9px;
-}
-button {
-  background: #fffdf7;
-  color: var(--ink);
-  padding: 0.62rem 0.9rem;
-}
-input,
-textarea,
-select {
-  width: 100%;
-  color: var(--ink);
-  background: #fffefa;
-  padding: 0.82rem 0.94rem;
-}
-textarea {
-  resize: vertical;
-}
-label {
+
+.form-field {
   display: grid;
   gap: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
 }
-h1,
-h2,
-h3,
-p {
-  margin-top: 0;
+.form-field [data-slot="native-select-wrapper"] {
+  width: 100%;
 }
-h1,
-h2,
-h3 {
-  letter-spacing: -0.035em;
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
 }
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"] {
+  background: #173a3066;
+}
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="native-select"] {
+  font-size: 1rem;
+}
+[data-slot="input"],
+[data-slot="native-select"] {
+  height: 44px;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -104,20 +134,6 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-.quiet {
-  background: transparent;
-  border: 0;
-  color: var(--muted);
-}
-.primary {
-  background: var(--green);
-  color: white;
-  border-color: var(--green);
-  font-weight: 600;
-}
-.primary:hover {
-  background: #143d34;
 }
 .gate {
   min-height: 100svh;
@@ -146,15 +162,15 @@ h3 {
 .gate-content p,
 .subtle {
   line-height: 1.6;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .gate-content form {
   display: grid;
   gap: 18px;
   margin-top: 38px;
 }
-.gate-content .primary {
-  padding: 14px;
+.gate-content button[type="submit"] {
+  height: 48px;
 }
 .gate-art {
   border-radius: 22px;
@@ -165,7 +181,7 @@ h3 {
   font-size: 0.88rem;
 }
 .selfhost {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 0.82rem;
   display: flex;
   align-items: center;
@@ -201,7 +217,7 @@ h3 {
   position: absolute;
   right: 4px;
   top: 4px;
-  bottom: 4px;
+  height: 36px;
   font-size: 0.8rem;
 }
 .error-note {

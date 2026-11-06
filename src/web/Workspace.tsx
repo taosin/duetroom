@@ -1,3 +1,6 @@
+import { Plus, Settings } from "lucide-react";
+import { Avatar, AvatarFallback } from "./components/ui/avatar";
+import { Button } from "./components/ui/button";
 import { useEffect, useState } from "react";
 import { Brand, Language, type Lang } from "./ui";
 import type { Companion } from "../shared/companion";
@@ -9,12 +12,11 @@ import "./workspace.css";
 
 function Portrait({ name, id }: { name: string; id: string }) {
   return (
-    <span
-      className={"portrait tone" + (id.charCodeAt(0) % 4)}
-      aria-hidden="true"
-    >
-      {Array.from(name)[0]}
-    </span>
+    <Avatar className="portrait" aria-hidden="true">
+      <AvatarFallback className={"tone" + (id.charCodeAt(0) % 4)}>
+        {Array.from(name)[0]}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 export default function Workspace({
@@ -71,27 +73,29 @@ export default function Workspace({
         <Brand />
         <div className="controls">
           <Language lang={lang} setLang={setLang} />
-          <button className="quiet" onClick={logout}>
+          <Button variant="ghost" onClick={logout}>
             {zh ? "退出" : "Sign out"}
-          </button>
+          </Button>
         </div>
       </header>
       <div className="studio-columns">
         <aside className="people">
           <div className="topline">
             <h2>{zh ? "我的伙伴" : "Companions"}</h2>
-            <button
-              className="add"
+            <Button
+              variant="outline"
+              size="icon-sm"
               onClick={() => edit("new")}
               title={zh ? "创建伙伴" : "New companion"}
               aria-label={zh ? "创建伙伴" : "New companion"}
             >
-              ＋
-            </button>
+              <Plus aria-hidden="true" />
+            </Button>
           </div>
           <nav aria-label={zh ? "切换伙伴" : "Choose companion"}>
             {rows.map((c) => (
-              <button
+              <Button
+                variant="ghost"
                 className={"person" + (c.id === active?.id ? " selected" : "")}
                 key={c.id}
                 onClick={() => select(c.id)}
@@ -99,7 +103,7 @@ export default function Workspace({
               >
                 <Portrait name={c.name} id={c.id} />
                 <span>{c.name}</span>
-              </button>
+              </Button>
             ))}
           </nav>
         </aside>
@@ -125,9 +129,10 @@ export default function Workspace({
                     companionId={active.id}
                     locale={lang}
                   />
-                  <button onClick={() => edit("edit")}>
+                  <Button variant="outline" onClick={() => edit("edit")}>
+                    <Settings aria-hidden="true" />
                     {zh ? "伙伴设置" : "Companion settings"}
-                  </button>
+                  </Button>
                 </div>
               </header>
               <Conversation
@@ -166,9 +171,9 @@ export default function Workspace({
                   ? "为对方取个名字，选好你们聊天的语言。"
                   : "Give them a name and choose the language you’ll speak together."}
               </p>
-              <button className="primary" onClick={() => edit("new")}>
+              <Button variant="default" onClick={() => edit("new")}>
                 {zh ? "创建第一位伙伴" : "Create your first companion"}
-              </button>
+              </Button>
             </div>
           )}
         </main>

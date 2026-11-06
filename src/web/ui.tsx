@@ -1,3 +1,4 @@
+import { Button } from "./components/ui/button";
 export type Lang = "zh" | "en";
 export function Brand() {
   return (
@@ -15,12 +16,12 @@ export function Language({
   setLang: (lang: Lang) => void;
 }) {
   return (
-    <button
-      className="quiet"
+    <Button
+      variant="ghost"
       onClick={() => setLang(lang === "zh" ? "en" : "zh")}
       lang={lang === "zh" ? "en" : "zh"}
     >
       {lang === "zh" ? "English" : "中文"}
-    </button>
+    </Button>
   );
 }

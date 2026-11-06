@@ -33,12 +33,6 @@
   gap: 6px;
   margin-top: 24px;
 }
-.add {
-  font-size: 21px;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-}
 .portrait {
   display: grid;
   place-items: center;
@@ -46,11 +40,16 @@
   background: #c9d8c6;
   color: #385848;
   border-radius: 13px;
+  overflow: hidden;
   font:
     600 22px Georgia,
     serif;
   width: 42px;
   height: 42px;
+}
+.tone0 {
+  background: #c9d8c6;
+  color: #385848;
 }
 .tone1 {
   background: #ebccb2;
@@ -65,6 +64,10 @@
   color: #796032;
 }
 .person {
+  height: auto;
+  min-height: 52px;
+  justify-content: flex-start;
+  width: 100%;
   background: transparent;
   border: 1px solid transparent;
   display: flex;
@@ -128,7 +131,7 @@
   margin: 10px 0 28px;
 }
 .room-welcome p {
-  color: var(--muted);
+  color: var(--muted-foreground);
   line-height: 1.6;
 }
 .editor {
@@ -140,9 +143,6 @@
   max-width: min(440px, 92vw);
   width: 100%;
   max-height: 90svh;
-}
-.editor::backdrop {
-  background: #173a3066;
 }
 .editor h2 {
   margin: 0;
@@ -159,15 +159,6 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-.danger {
-  color: #9e4535;
-}
-.actions .danger:first-child {
-  margin-right: auto;
-}
-.close {
-  font-size: 23px;
 }
 @media (max-width: 720px) {
   .studio {
@@ -197,6 +188,12 @@
     margin: 0;
   }
   .person {
+    height: auto;
+    min-height: 36px;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
     padding: 4px 8px;
   }
   .person .portrait {
@@ -210,6 +207,13 @@
   }
   .room-bar {
     padding: 10px 13px;
+    flex-wrap: wrap;
+  }
+  .room-bar .identity {
+    flex: 1 0 80px;
+  }
+  .room-bar .controls {
+    flex-wrap: wrap;
   }
   .room-bar .portrait {
     display: none;
@@ -219,17 +223,71 @@
   }
 }
 
+@media (max-width: 380px) {
+  .studio-bar .brand {
+    font-size: 22px;
+    gap: 6px;
+  }
+  .studio-bar .brand img {
+    width: 30px;
+    height: 30px;
+  }
+  .studio-bar .controls {
+    gap: 2px;
+  }
+  .studio-bar .controls button {
+    padding-inline: 8px;
+  }
+}
+
 /* Keep the composer in view and let the message history do the scrolling. */
 @media (min-height: 580px) {
-  .studio { display:flex; flex-direction:column; height:100dvh; }
-  .studio-bar, .room-bar { flex-shrink:0; }
-  .studio-columns { flex:1; min-height:0; }
-  .people { overflow:auto; }
-  .room { min-height:0; overflow:auto; }
-  .room .duet-chat { flex:1; min-height:0; border:0; border-radius:0; }
-  .room .duet-history { flex:1; min-height:70px; height:auto; }
-  .duet-chatbar, .duet-threadbar, .duet-notice, .duet-composer { flex-shrink:0; }
+  .studio {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+  .studio-bar,
+  .room-bar {
+    flex-shrink: 0;
+  }
+  .studio-columns {
+    flex: 1;
+    min-height: 0;
+  }
+  .people {
+    overflow: auto;
+  }
+  .room {
+    min-height: 0;
+    overflow: auto;
+  }
+  .room .duet-chat {
+    flex: 1;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .room .duet-history {
+    flex: 1;
+    min-height: 70px;
+    height: auto;
+  }
+  .duet-chatbar,
+  .duet-threadbar,
+  .duet-notice,
+  .duet-composer {
+    flex-shrink: 0;
+  }
 }
-.call-panel { max-width:min(360px, 58vw); font-size:.86rem; }
-.call-panel p { margin:4px 0 8px; line-height:1.45; }
-.call-panel button { margin-inline-end:4px; }
+.call-panel {
+  max-width: min(360px, 58vw);
+  font-size: 0.86rem;
+}
+.call-panel p {
+  margin: 4px 0 8px;
+  line-height: 1.45;
+}
+.call-panel button {
+  margin-inline-end: 4px;
+}

@@ -1,3 +1,5 @@
+import { Phone, PhoneOff } from "lucide-react";
+import { Button } from "../components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import { openCall } from "./device";
 
@@ -108,9 +110,9 @@ export function CallProblem({
   return (
     <>
       <p role="alert">{text}</p>
-      <button type="button" onClick={onBack}>
+      <Button variant="outline" type="button" onClick={onBack}>
         {labels.back}
-      </button>
+      </Button>
     </>
   );
 }
@@ -238,9 +240,15 @@ export default function CallPanel({
   }
   if (state === "idle")
     return (
-      <button type="button" onClick={prepare} disabled={disabled}>
+      <Button
+        variant="outline"
+        type="button"
+        onClick={prepare}
+        disabled={disabled}
+      >
+        <Phone aria-hidden="true" />
         {labels.call}
-      </button>
+      </Button>
     );
   return (
     <section className="call-panel" aria-label={labels.call}>
@@ -251,15 +259,20 @@ export default function CallPanel({
             {labels.consent} {model || labels.model}
             {lang === "zh" ? "。" : "."} {labels.storage}
           </p>
-          <button type="button" onClick={connect} disabled={disabled}>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={connect}
+            disabled={disabled}
+          >
             {labels.connect}
-          </button>
+          </Button>
         </>
       )}
       {(state === "checking" || state === "consent") && (
-        <button type="button" onClick={reset}>
+        <Button variant="outline" type="button" onClick={reset}>
           {labels.cancel}
-        </button>
+        </Button>
       )}
       {state === "error" && (
         <CallProblem lang={lang} code={error} onBack={reset} />
@@ -273,23 +286,33 @@ export default function CallPanel({
           {caption && <p>{caption}</p>}
           {remaining && <p>{remaining.text}</p>}
           {offer && (
-            <button type="button" onClick={() => current.current?.reveal()}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => current.current?.reveal()}
+            >
               {labels.reveal}
-            </button>
+            </Button>
           )}
           {state === "replying" && (
-            <button type="button" onClick={() => current.current?.interrupt()}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => current.current?.interrupt()}
+            >
               {labels.interrupt}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="destructive"
             type="button"
             onClick={() => {
               current.current?.close();
             }}
           >
+            <PhoneOff aria-hidden="true" />
             {labels.hangup}
-          </button>
+          </Button>
         </>
       )}
     </section>

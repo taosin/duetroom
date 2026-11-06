@@ -1,3 +1,4 @@
+import { Button } from "./components/ui/button";
 import { createRoot } from "react-dom/client";
 import { useEffect, useState } from "react";
 import Login from "./Login";
@@ -42,9 +43,9 @@ function App() {
             ? "连接失败，请检查服务是否已启动。"
             : "Could not connect to DuetRoom."}
         </p>
-        <button onClick={() => location.reload()}>
+        <Button variant="outline" onClick={() => location.reload()}>
           {zh ? "重试" : "Retry"}
-        </button>
+        </Button>
       </main>
     );
   if (session === "out")

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { RoomDialog } from "../components/RoomDialog";
+import { Label } from "../components/ui/label";
+import { NativeSelect } from "../components/ui/native-select";
+import { Textarea } from "../components/ui/textarea";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { useEffect, useState, type FormEvent } from "react";
 import type { Companion, CompanionInput } from "../../shared/companion";
 import type { Lang } from "../ui";
 export default function Editor({
@@ -14,8 +20,7 @@ export default function Editor({
   onSave: (c: Companion) => void;
   onDelete: (id: string) => void;
 }) {
-  const zh = lang === "zh",
-    dialog = useRef<HTMLDialogElement>(null);
+  const zh = lang === "zh";
   const [input, setInput] = useState<CompanionInput>(
     companion
       ? {
@@ -29,11 +34,6 @@ export default function Editor({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(false),
     [deleting, setDeleting] = useState(false);
-  useEffect(() => {
-    const el = dialog.current;
-    el?.showModal();
-    return () => el?.close();
-  }, []);
   const [voices, setVoices] = useState<
     { id: string; name: string; locale: string }[]
   >([]);
@@ -89,34 +89,25 @@ export default function Editor({
     }
   }
   return (
-    <dialog
-      ref={dialog}
+    <RoomDialog
       className="editor"
-      onCancel={onClose}
-      aria-labelledby="editor-title"
-    >
-      <header className="topline">
-        <h2 id="editor-title">
-          {deleting
+      title={
+        deleting
+          ? zh
+            ? "删除伙伴？"
+            : "Delete companion?"
+          : companion
             ? zh
-              ? "删除伙伴？"
-              : "Delete companion?"
-            : companion
-              ? zh
-                ? "伙伴设置"
-                : "Companion settings"
-              : zh
-                ? "创建伙伴"
-                : "New companion"}
-        </h2>
-        <button
-          className="quiet close"
-          onClick={onClose}
-          aria-label={zh ? "关闭" : "Close"}
-        >
-          ×
-        </button>
-      </header>
+              ? "伙伴设置"
+              : "Companion settings"
+            : zh
+              ? "创建伙伴"
+              : "New companion"
+      }
+      closeLabel={zh ? "关闭" : "Close"}
+      onClose={onClose}
+      busy={busy}
+    >
       {deleting ? (
         <>
           <p>
@@ -125,29 +116,29 @@ export default function Editor({
               : "This also deletes their conversations and memories."}
           </p>
           <div className="actions">
-            <button onClick={() => setDeleting(false)}>
+            <Button variant="outline" onClick={() => setDeleting(false)}>
               {zh ? "取消" : "Cancel"}
-            </button>
-            <button className="danger" disabled={busy} onClick={remove}>
+            </Button>
+            <Button variant="destructive" disabled={busy} onClick={remove}>
               {zh ? "确认删除" : "Confirm deletion"}
-            </button>
+            </Button>
           </div>
         </>
       ) : (
         <form onSubmit={save}>
-          <label>
+          <Label className="form-field">
             {zh ? "名字" : "Name"}
-            <input
+            <Input
               autoFocus
               required
               value={input.name}
               maxLength={80}
               onChange={(e) => update("name", e.target.value)}
             />
-          </label>
-          <label>
+          </Label>
+          <Label className="form-field">
             {zh ? "性格" : "Personality"}
-            <textarea
+            <Textarea
               value={input.persona}
               rows={3}
               maxLength={2000}
@@ -158,10 +149,10 @@ export default function Editor({
               }
               onChange={(e) => update("persona", e.target.value)}
             />
-          </label>
-          <label>
+          </Label>
+          <Label className="form-field">
             {zh ? "对话语言" : "Conversation language"}
-            <select
+            <NativeSelect
               value={input.locale}
               onChange={(e) =>
                 setInput((v) => ({ ...v, locale: e.target.value, voice: "" }))
@@ -169,11 +160,11 @@ export default function Editor({
             >
               <option value="zh-CN">简体中文</option>
               <option value="en-US">English</option>
-            </select>
-          </label>
-          <label>
+            </NativeSelect>
+          </Label>
+          <Label className="form-field">
             {zh ? "音色" : "Voice"}
-            <select
+            <NativeSelect
               value={input.voice}
               onChange={(e) => update("voice", e.target.value)}
             >
@@ -190,24 +181,29 @@ export default function Editor({
                     {v.name}
                   </option>
                 ))}
-            </select>
-          </label>
+            </NativeSelect>
+          </Label>
           <div className="actions">
             {companion && (
-              <button
-                className="quiet danger"
+              <Button
+                variant="ghost"
+                className="text-destructive mr-auto"
                 type="button"
                 onClick={() => setDeleting(true)}
               >
                 {zh ? "删除" : "Delete"}
-              </button>
+              </Button>
             )}
-            <button type="button" onClick={onClose}>
+            <Button variant="outline" type="button" onClick={onClose}>
               {zh ? "取消" : "Cancel"}
-            </button>
-            <button className="primary" disabled={busy || !input.name.trim()}>
+            </Button>
+            <Button
+              type="submit"
+              variant="default"
+              disabled={busy || !input.name.trim()}
+            >
               {zh ? "保存" : "Save"}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -216,6 +212,6 @@ export default function Editor({
           {zh ? "操作失败，请重试。" : "Could not save this change. Try again."}
         </p>
       )}
-    </dialog>
+    </RoomDialog>
   );
 }

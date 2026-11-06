@@ -1,4 +1,8 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { RoomDialog } from "../components/RoomDialog";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import { Button } from "../components/ui/button";
+import { useEffect, useState } from "react";
 import "./memories.css";
 
 interface Props {
@@ -105,49 +109,6 @@ function describe(error: unknown, t: Strings) {
   return t.failed;
 }
 
-function Dialog({
-  title,
-  closeLabel,
-  onClose,
-  children,
-}: {
-  title: string;
-  closeLabel: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  useEffect(() => {
-    const element = ref.current!;
-    element.showModal();
-    return () => element.close();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      className="memory-dialog"
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
-    >
-      <div className="topline">
-        <h2 id={titleId}>{title}</h2>
-        <button
-          className="quiet"
-          type="button"
-          onClick={onClose}
-          aria-label={closeLabel}
-        >
-          ×
-        </button>
-      </div>
-      {children}
-    </dialog>
-  );
-}
 function Origin({ row, locale }: { row: Preview; locale: string }) {
   return (
     <small className="memory-origin">
@@ -185,26 +146,32 @@ function Editor({
         submit();
       }}
     >
-      <label>
+      <Label className="form-field">
         {t.fact}
-        <textarea
+        <Textarea
           rows={3}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={busy}
         />
-      </label>
+      </Label>
       <div className="memory-editor-foot">
         <small aria-live="polite">{length} / 200</small>
-        <button type="button" onClick={cancel} disabled={busy}>
+        <Button
+          variant="outline"
+          type="button"
+          onClick={cancel}
+          disabled={busy}
+        >
           {t.cancel}
-        </button>
-        <button
-          className="primary"
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
           disabled={busy || length < 1 || length > 200}
         >
           {t.save}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -257,7 +224,13 @@ function PreviewDialog({
     }
   }
   return (
-    <Dialog title={t.preview} closeLabel={t.close} onClose={close}>
+    <RoomDialog
+      busy={busy}
+      className="memory-dialog"
+      title={t.preview}
+      closeLabel={t.close}
+      onClose={close}
+    >
       {row && (
         <>
           <Origin row={row} locale={locale} />
@@ -277,7 +250,7 @@ function PreviewDialog({
           {error}
         </p>
       )}
-    </Dialog>
+    </RoomDialog>
   );
 }
 
@@ -300,13 +273,15 @@ function RememberAction(props: Props & { source: Source }) {
   }, [saved]);
   return (
     <>
-      <button
+      <Button
+        variant="link"
         type="button"
-        className="memory-action quiet"
+        size="sm"
+        className="memory-action"
         onClick={() => setOpen(true)}
       >
         {t.remember}
-      </button>
+      </Button>
       {saved && <small role="status">{t.remembered}</small>}
       {open && (
         <PreviewDialog
@@ -376,7 +351,9 @@ function ListDialog({
     }
   }
   return (
-    <Dialog
+    <RoomDialog
+      busy={busy}
+      className="memory-dialog"
       title={t.memories}
       closeLabel={t.close}
       onClose={() => {
@@ -386,7 +363,9 @@ function ListDialog({
       {error && (
         <div role="alert" className="feedback">
           {error}{" "}
-          <button onClick={() => refresh((v) => v + 1)}>{t.retry}</button>
+          <Button variant="outline" onClick={() => refresh((v) => v + 1)}>
+            {t.retry}
+          </Button>
         </div>
       )}
       {!rows && !error && <p>{t.loading}</p>}
@@ -409,7 +388,8 @@ function ListDialog({
                 <>
                   <p className="memory-fact">{row.text}</p>
                   <div className="memory-tools">
-                    <button
+                    <Button
+                      variant="outline"
                       disabled={busy}
                       onClick={() => {
                         setDraft(row.text);
@@ -417,8 +397,9 @@ function ListDialog({
                       }}
                     >
                       {t.edit}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="outline"
                       disabled={busy}
                       aria-pressed={row.pinned}
                       onClick={() =>
@@ -426,14 +407,14 @@ function ListDialog({
                       }
                     >
                       {row.pinned ? t.unpin : t.pin}
-                    </button>
-                    <button
-                      className="quiet"
+                    </Button>
+                    <Button
+                      variant="ghost"
                       disabled={busy}
                       onClick={() => change(row.id, "DELETE")}
                     >
                       {t.remove}
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -441,7 +422,7 @@ function ListDialog({
           ))}
         </ul>
       )}
-    </Dialog>
+    </RoomDialog>
   );
 }
 
@@ -449,9 +430,9 @@ export function Memories({ companionId, locale }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)}>
+      <Button variant="outline" type="button" onClick={() => setOpen(true)}>
         {words(locale).memories}
-      </button>
+      </Button>
       {open && (
         <ListDialog
           key={companionId}
