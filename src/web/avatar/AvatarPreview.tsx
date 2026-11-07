@@ -4,14 +4,37 @@ import { Download, RotateCcw } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { RoomDialog } from "../components/RoomDialog";
 import type { Lang } from "../ui";
-import model from "./companion.glb?url";
+import animatedModel from "./companion.glb?url";
+import scanModel from "./scanned.glb?url";
+import scanPortrait from "./scanned.webp";
 import portrait from "./portrait.webp";
 import "./avatar.css";
 
-const cameras = {
-  portrait: { orbit: "-8deg 84deg .96m", target: "0m 1.54m 0m" },
-  full: { orbit: "4deg 87deg 4.2m", target: "0m .88m 0m" },
+const avatars = {
+  scan: {
+    src: scanModel,
+    poster: scanPortrait,
+    file: "DuetRoom-scan.glb",
+    alt: {
+      zh: "身穿条纹衬衫的女性全身扫描",
+      en: "Full-body scan of a woman in a striped blouse",
+    },
+    portrait: { orbit: "-6deg 84deg .94m", target: "0m 1.455m .035m" },
+    full: { orbit: "4deg 87deg 4.2m", target: "0m .85m 0m" },
+  },
+  animated: {
+    src: animatedModel,
+    poster: portrait,
+    file: "DuetRoom-avatar.glb",
+    alt: {
+      zh: "身穿深绿色外套的女性数字人",
+      en: "3D figure of a woman in a deep green jacket",
+    },
+    portrait: { orbit: "-8deg 84deg .96m", target: "0m 1.54m 0m" },
+    full: { orbit: "4deg 87deg 4.2m", target: "0m .88m 0m" },
+  },
 };
+type AvatarKind = keyof typeof avatars;
 
 export function AvatarPreview({ lang }: { lang: Lang }) {
   const [open, setOpen] = useState(false);
@@ -23,7 +46,7 @@ export function AvatarPreview({ lang }: { lang: Lang }) {
         className="avatar-entry"
         onClick={() => setOpen(true)}
       >
-        <img src={portrait} alt="" />
+        <img src={scanPortrait} alt="" />
         <span>{zh ? "查看 3D 形象" : "View 3D avatar"}</span>
       </Button>
       {open && <AvatarStudio lang={lang} onClose={() => setOpen(false)} />}
@@ -33,6 +56,65 @@ export function AvatarPreview({ lang }: { lang: Lang }) {
 
 function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
   const zh = lang === "zh";
+  const [kind, setKind] = useState<AvatarKind>("scan");
+  return (
+    <RoomDialog
+      title={zh ? "3D 形象" : "3D avatar"}
+      closeLabel={zh ? "关闭" : "Close"}
+      onClose={onClose}
+      className="avatar-dialog"
+    >
+      <div
+        className="avatar-choices"
+        role="group"
+        aria-label={zh ? "选择形象" : "Choose avatar"}
+      >
+        <Button
+          size="sm"
+          variant={kind === "scan" ? "secondary" : "ghost"}
+          aria-pressed={kind === "scan"}
+          onClick={() => setKind("scan")}
+        >
+          {zh ? "实拍形象" : "Photo scan"}
+        </Button>
+        <Button
+          size="sm"
+          variant={kind === "animated" ? "secondary" : "ghost"}
+          aria-pressed={kind === "animated"}
+          onClick={() => setKind("animated")}
+        >
+          {zh ? "动画形象" : "Animated"}
+        </Button>
+      </div>
+      <AvatarView key={kind} kind={kind} lang={lang} />
+      {kind === "scan" && (
+        <small className="avatar-credit">
+          <a
+            href="https://huggingface.co/datasets/digitalrealitylab/HSRD-100"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Digital Reality Lab · HSRD-100
+          </a>
+          {" · "}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            CC BY 4.0
+          </a>
+          {" · "}
+          {zh ? "网页适配" : "Adapted for web"}
+        </small>
+      )}
+    </RoomDialog>
+  );
+}
+
+function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
+  const zh = lang === "zh";
+  const avatar = avatars[kind];
   const host = useRef<HTMLDivElement>(null);
   const viewer = useRef<ModelViewerElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
@@ -54,7 +136,7 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
     const updateMotion = () => {
       const el = viewer.current;
       if (!el) return;
-      if (motion.matches) {
+      if (motion.matches || kind === "scan") {
         el.pause();
         el.currentTime = 0;
       } else {
@@ -72,12 +154,10 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
         if (closed || !host.current) return;
         const el = document.createElement("model-viewer") as ModelViewerElement;
         viewer.current = el;
-        el.alt = zh
-          ? "身穿深绿色外套的女性数字人"
-          : "3D figure of a woman in a deep green jacket";
+        el.alt = avatar.alt[lang];
         el.cameraControls = true;
-        el.cameraOrbit = cameras.portrait.orbit;
-        el.cameraTarget = cameras.portrait.target;
+        el.cameraOrbit = avatar.portrait.orbit;
+        el.cameraTarget = avatar.portrait.target;
         el.fieldOfView = "28deg";
         el.minCameraOrbit = "auto 48deg 0.42m";
         el.maxCameraOrbit = "auto 112deg 5m";
@@ -90,7 +170,7 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
         el.loading = "eager";
         el.addEventListener("load", ready);
         el.addEventListener("error", failed);
-        el.src = model;
+        el.src = avatar.src;
         host.current.appendChild(el);
       })
       .catch(() => {
@@ -109,12 +189,12 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
       }
       viewer.current = null;
     };
-  }, [zh]);
+  }, [avatar, kind, lang]);
 
   function frame(wide: boolean) {
     const el = viewer.current;
     if (!el) return;
-    const camera = wide ? cameras.full : cameras.portrait;
+    const camera = wide ? avatar.full : avatar.portrait;
     el.cameraTarget = camera.target;
     el.cameraOrbit = camera.orbit;
     el.fieldOfView = "28deg";
@@ -124,17 +204,12 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
   }
 
   return (
-    <RoomDialog
-      title={zh ? "3D 形象" : "3D avatar"}
-      closeLabel={zh ? "关闭" : "Close"}
-      onClose={onClose}
-      className="avatar-dialog"
-    >
+    <>
       <div className="avatar-stage">
         {status !== "ready" && (
           <img
             className="avatar-fallback"
-            src={portrait}
+            src={avatar.poster}
             alt={zh ? "数字人肖像" : "Avatar portrait"}
           />
         )}
@@ -172,12 +247,12 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
           <RotateCcw />
         </Button>
         <Button variant="ghost" size="sm" asChild>
-          <a href={model} download="DuetRoom-avatar.glb">
+          <a href={avatar.src} download={avatar.file}>
             <Download />
             {zh ? "下载模型" : "Download model"}
           </a>
         </Button>
       </div>
-    </RoomDialog>
+    </>
   );
 }

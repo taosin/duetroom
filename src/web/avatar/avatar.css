@@ -19,6 +19,7 @@
   padding: 3px 12px 10px;
 }
 .avatar-dialog {
+  grid-template-columns: minmax(0, 1fr);
   width: min(600px, calc(100vw - 24px));
   max-width: 600px;
   gap: 10px;
@@ -30,7 +31,7 @@
 }
 .avatar-stage {
   position: relative;
-  height: clamp(180px, 61dvh, 570px);
+  height: clamp(180px, 55dvh, 570px);
   overflow: hidden;
   border-radius: 12px;
   background: radial-gradient(
@@ -61,6 +62,7 @@
 }
 .avatar-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
@@ -84,4 +86,23 @@
   .avatar-entry span {
     padding: 0 10px 0 0;
   }
+}
+
+.avatar-choices {
+  display: flex;
+  gap: 4px;
+}
+.avatar-credit {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+.avatar-credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 360px) {
+  .avatar-dialog { padding: 12px; }
+  .avatar-tools a { padding-inline: 6px; }
 }
