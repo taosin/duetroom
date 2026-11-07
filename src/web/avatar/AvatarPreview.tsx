@@ -6,6 +6,7 @@ import { RoomDialog } from "../components/RoomDialog";
 import type { Lang } from "../ui";
 import studioModel from "./studio.glb?url";
 import studioPortrait from "./studio.webp";
+import portraitLight from "./portrait-light.hdr?url";
 import animatedModel from "./companion.glb?url";
 import scanModel from "./scanned.glb?url";
 import scanPortrait from "./scanned.webp";
@@ -184,8 +185,8 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
         el.maxFieldOfView = "38deg";
         el.disablePan = true;
         el.interactionPrompt = "none";
-        el.environmentImage = "neutral";
-        el.exposure = 1.05;
+        el.environmentImage = kind === "studio" ? portraitLight : "neutral";
+        el.exposure = kind === "studio" ? 1 : 1.05;
         el.loading = "eager";
         el.addEventListener("load", ready);
         el.addEventListener("error", failed);
@@ -224,7 +225,7 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
 
   return (
     <>
-      <div className="avatar-stage">
+      <div className="avatar-stage" data-avatar={kind}>
         {status !== "ready" && (
           <img
             className="avatar-fallback"

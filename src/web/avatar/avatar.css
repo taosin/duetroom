@@ -41,6 +41,9 @@
     #9da49a
   );
 }
+.avatar-stage[data-avatar="studio"] {
+  background: radial-gradient(ellipse at 35% 24%, #e6e1dc, #c3c2bf 68%, #969c99);
+}
 .avatar-fallback,
 .avatar-view,
 .avatar-view model-viewer {
