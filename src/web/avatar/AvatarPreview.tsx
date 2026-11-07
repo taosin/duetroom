@@ -156,7 +156,7 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
     const updateMotion = () => {
       const el = viewer.current;
       if (!el) return;
-      if (motion.matches || kind !== "animated") {
+      if (motion.matches || el.availableAnimations.length === 0) {
         el.pause();
         el.currentTime = 0;
       } else {
