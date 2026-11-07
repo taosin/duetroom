@@ -1,3 +1,4 @@
+import { AvatarPreview } from "./avatar/AvatarPreview";
 import { Plus, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "./components/ui/avatar";
 import { Button } from "./components/ui/button";
@@ -106,6 +107,7 @@ export default function Workspace({
               </Button>
             ))}
           </nav>
+          <AvatarPreview lang={lang} />
         </aside>
         <main className="room">
           {!ready ? (
