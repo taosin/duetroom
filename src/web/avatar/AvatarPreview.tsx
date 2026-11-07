@@ -4,14 +4,32 @@ import { Download, RotateCcw } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { RoomDialog } from "../components/RoomDialog";
 import type { Lang } from "../ui";
+import studioModel from "./studio.glb?url";
+import studioPortrait from "./studio.webp";
 import animatedModel from "./companion.glb?url";
 import scanModel from "./scanned.glb?url";
 import scanPortrait from "./scanned.webp";
 import portrait from "./portrait.webp";
 import "./avatar.css";
 
+const avatarKinds = ["studio", "scan", "animated"] as const;
+type AvatarKind = (typeof avatarKinds)[number];
+
 const avatars = {
+  studio: {
+    label: { zh: "写实肖像", en: "Studio portrait" },
+    src: studioModel,
+    poster: studioPortrait,
+    file: "DuetRoom-studio.glb",
+    alt: {
+      zh: "长发女性数字伙伴的定制三维肖像",
+      en: "A custom 3D portrait of a companion with long dark hair",
+    },
+    portrait: { orbit: "-4deg 86deg .90m", target: "0m 1.455m .035m" },
+    full: { orbit: "4deg 87deg 4.2m", target: "0m .85m 0m" },
+  },
   scan: {
+    label: { zh: "实拍形象", en: "Photo scan" },
     src: scanModel,
     poster: scanPortrait,
     file: "DuetRoom-scan.glb",
@@ -23,6 +41,7 @@ const avatars = {
     full: { orbit: "4deg 87deg 4.2m", target: "0m .85m 0m" },
   },
   animated: {
+    label: { zh: "动画形象", en: "Animated" },
     src: animatedModel,
     poster: portrait,
     file: "DuetRoom-avatar.glb",
@@ -34,7 +53,6 @@ const avatars = {
     full: { orbit: "4deg 87deg 4.2m", target: "0m .88m 0m" },
   },
 };
-type AvatarKind = keyof typeof avatars;
 
 export function AvatarPreview({ lang }: { lang: Lang }) {
   const [open, setOpen] = useState(false);
@@ -46,7 +64,7 @@ export function AvatarPreview({ lang }: { lang: Lang }) {
         className="avatar-entry"
         onClick={() => setOpen(true)}
       >
-        <img src={scanPortrait} alt="" />
+        <img src={studioPortrait} alt="" />
         <span>{zh ? "查看 3D 形象" : "View 3D avatar"}</span>
       </Button>
       {open && <AvatarStudio lang={lang} onClose={() => setOpen(false)} />}
@@ -56,7 +74,7 @@ export function AvatarPreview({ lang }: { lang: Lang }) {
 
 function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
   const zh = lang === "zh";
-  const [kind, setKind] = useState<AvatarKind>("scan");
+  const [kind, setKind] = useState<AvatarKind>("studio");
   return (
     <RoomDialog
       title={zh ? "3D 形象" : "3D avatar"}
@@ -69,25 +87,20 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
         role="group"
         aria-label={zh ? "选择形象" : "Choose avatar"}
       >
-        <Button
-          size="sm"
-          variant={kind === "scan" ? "secondary" : "ghost"}
-          aria-pressed={kind === "scan"}
-          onClick={() => setKind("scan")}
-        >
-          {zh ? "实拍形象" : "Photo scan"}
-        </Button>
-        <Button
-          size="sm"
-          variant={kind === "animated" ? "secondary" : "ghost"}
-          aria-pressed={kind === "animated"}
-          onClick={() => setKind("animated")}
-        >
-          {zh ? "动画形象" : "Animated"}
-        </Button>
+        {avatarKinds.map((id) => (
+          <Button
+            key={id}
+            size="sm"
+            variant={kind === id ? "secondary" : "ghost"}
+            aria-pressed={kind === id}
+            onClick={() => setKind(id)}
+          >
+            {avatars[id].label[lang]}
+          </Button>
+        ))}
       </div>
       <AvatarView key={kind} kind={kind} lang={lang} />
-      {kind === "scan" && (
+      {kind !== "animated" && (
         <small className="avatar-credit">
           <a
             href="https://huggingface.co/datasets/digitalrealitylab/HSRD-100"
@@ -105,7 +118,13 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
             CC BY 4.0
           </a>
           {" · "}
-          {zh ? "网页适配" : "Adapted for web"}
+          {kind === "studio"
+            ? zh
+              ? "面部重塑与生成纹理"
+              : "Reshaped face and generated texture"
+            : zh
+              ? "网页适配"
+              : "Adapted for web"}
         </small>
       )}
     </RoomDialog>
@@ -136,7 +155,7 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
     const updateMotion = () => {
       const el = viewer.current;
       if (!el) return;
-      if (motion.matches || kind === "scan") {
+      if (motion.matches || kind !== "animated") {
         el.pause();
         el.currentTime = 0;
       } else {
