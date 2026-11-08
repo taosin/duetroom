@@ -1,4 +1,6 @@
 import { frame, unpack } from "./protocol";
+import { speakerTime } from "../audio/mouth";
+import { attachCallMouth } from "./playback-mouth";
 
 type Hooks = {
   event: (event: { type: string; text?: string; generation?: number }) => void;
@@ -13,6 +15,8 @@ export function openCall(
   let socket: WebSocket | undefined;
   let context: AudioContext | undefined;
   let worklet: AudioWorkletNode | undefined;
+  let mouth: ReturnType<typeof attachCallMouth> | undefined;
+  let synthesisFailed = false;
   let closed = false;
   const listeners = new AbortController();
   const watch = (
@@ -48,6 +52,8 @@ export function openCall(
     );
   };
   function resetAudio(g: number) {
+    mouth?.reset();
+    synthesisFailed = false;
     generation = g;
     downSequence = 0;
     lastPlayed = 0;
@@ -74,6 +80,7 @@ export function openCall(
       worklet.disconnect();
       worklet.port.close();
     }
+    mouth?.close();
     if (context && context.state !== "closed")
       void context.close().catch(() => {});
     send("call.end");
@@ -161,7 +168,9 @@ export function openCall(
     });
     watch(worklet, "processorerror", () => close("device"));
     audio.createMediaStreamSource(stream).connect(worklet);
-    worklet.connect(audio.destination);
+    mouth = attachCallMouth(companionId, audio);
+    worklet.connect(mouth.node);
+    mouth.node.connect(audio.destination);
     worklet.port.onmessage = ({ data }) => {
       if (closed || !ready || !socket || socket.readyState !== WebSocket.OPEN)
         return;
@@ -175,30 +184,19 @@ export function openCall(
         }
         socket.send(frame(1, 0, 0, ++sequence, new Uint8Array(samples.buffer)));
       } else if (data.generation === generation) {
-        if (data.type === "speaking" || data.type === "listening")
+        if (data.type === "speaking" || data.type === "listening") {
+          if (data.type === "speaking" && !synthesisFailed)
+            mouth?.speaking(data.at);
+          if (data.type === "listening") mouth?.listening(data.at);
           publish(data.type, data.at, data.bufferedMs);
+        }
         if (data.type === "consumed")
           send("consumed", { generation, sequence: data.sequence });
         if (data.type === "played") {
           const g = generation;
           // Rendering runs ahead of the speaker. Wait for the hardware clock,
           // or conservative output latency when the timestamp API is absent.
-          const clock = audio.getOutputTimestamp?.();
-          const delay =
-            clock && clock.contextTime && clock.performanceTime
-              ? Math.max(
-                  0,
-                  clock.performanceTime +
-                    (data.at - clock.contextTime) * 1000 -
-                    performance.now(),
-                )
-              : Math.max(
-                  0,
-                  (data.at -
-                    audio.currentTime +
-                    (audio.outputLatency || audio.baseLatency || 0.08)) *
-                    1000,
-                );
+          const delay = Math.max(0, (data.at - speakerTime(audio)) * 1000);
           const timer = setTimeout(() => {
             timers.delete(timer);
             if (!closed && generation === g && audio.state === "running") {
@@ -262,8 +260,11 @@ export function openCall(
           resetAudio(msg.generation);
           publish("interrupted");
         }
-        if (msg.type === "synthesis.failed")
+        if (msg.type === "synthesis.failed" && msg.generation === generation) {
+          synthesisFailed = true;
+          mouth?.reset();
           worklet!.port.postMessage({ type: "reset", generation });
+        }
         if (msg.type === "reply") {
           resetAudio(msg.generation);
         }

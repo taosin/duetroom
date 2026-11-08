@@ -37,6 +37,7 @@ export default function Workspace({
     () => localStorage.getItem("duet.companion") || "",
   );
   const [mode, edit] = useState<"new" | "edit" | null>(null);
+  const [inCall, setInCall] = useState(false);
   const active = rows.find((v) => v.id === id) || rows[0];
   useEffect(() => {
     let alive = true;
@@ -107,7 +108,7 @@ export default function Workspace({
               </Button>
             ))}
           </nav>
-          <AvatarPreview lang={lang} />
+          <AvatarPreview lang={lang} disabled={inCall} />
         </aside>
         <main className="room">
           {!ready ? (
@@ -152,7 +153,10 @@ export default function Workspace({
                     onHistoryChange={refresh}
                     disabled={busy || !conversationId}
                     conversationId={conversationId}
-                    onActiveChange={setCallActive}
+                    onActiveChange={(active) => {
+                      setCallActive(active);
+                      setInCall(active);
+                    }}
                   />
                 )}
                 renderMessageAction={(source) => (

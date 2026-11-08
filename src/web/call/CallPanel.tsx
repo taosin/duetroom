@@ -1,6 +1,8 @@
 import { Phone, PhoneOff } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { useEffect, useRef, useState } from "react";
+import { RoomDialog } from "../components/RoomDialog";
+import { CallPortrait } from "../avatar/AvatarPreview";
 import { openCall } from "./device";
 
 const copy = {
@@ -11,6 +13,8 @@ const copy = {
     connect: "Start call",
     cancel: "Cancel",
     hangup: "Hang up",
+    show: "Show call portrait",
+    minimize: "Minimize portrait",
     checking: "Checking voice service…",
     consent:
       "Your microphone audio goes to Azure Speech. The transcript goes to",
@@ -48,6 +52,8 @@ const copy = {
     connect: "接通",
     cancel: "取消",
     hangup: "挂断",
+    show: "查看通话形象",
+    minimize: "收起形象",
     checking: "正在检查语音服务…",
     consent: "麦克风音频将发送到 Azure Speech，转写文本将发送到",
     model: "部署者配置的聊天模型",
@@ -129,6 +135,8 @@ export default function CallPanel({
   const [model, setModel] = useState("");
   const [error, setError] = useState("call_failed");
   const [caption, setCaption] = useState("");
+  const [portraitOpen, setPortraitOpen] = useState(false);
+  const reopen = useRef<HTMLButtonElement>(null);
   const [offer, setOffer] = useState(false);
   const [remaining, setRemaining] = useState<{
     text: string;
@@ -158,6 +166,7 @@ export default function CallPanel({
   useEffect(() => {
     setState("idle");
     setCaption("");
+    setPortraitOpen(false);
     return () => {
       handle.current++;
       if (current.current) activeChange.current?.(false);
@@ -196,6 +205,7 @@ export default function CallPanel({
     const token = ++handle.current;
     setOffer(false);
     setRemaining(undefined);
+    setPortraitOpen(true);
     setState("connecting");
     activeChange.current?.(true);
     current.current = openCall(
@@ -228,6 +238,7 @@ export default function CallPanel({
           current.current = undefined;
           activeChange.current?.(false);
           setCaption("");
+          setPortraitOpen(false);
           if (code) {
             setError(code);
             setState("error");
@@ -250,41 +261,29 @@ export default function CallPanel({
         {labels.call}
       </Button>
     );
-  return (
-    <section className="call-panel" aria-label={labels.call}>
-      {state === "checking" && <p role="status">{labels.checking}</p>}
-      {state === "consent" && (
-        <>
-          <p>
-            {labels.consent} {model || labels.model}
-            {lang === "zh" ? "。" : "."} {labels.storage}
-          </p>
-          <Button
-            variant="outline"
-            type="button"
-            onClick={connect}
-            disabled={disabled}
-          >
-            {labels.connect}
-          </Button>
-        </>
-      )}
-      {(state === "checking" || state === "consent") && (
-        <Button variant="outline" type="button" onClick={reset}>
-          {labels.cancel}
-        </Button>
-      )}
-      {state === "error" && (
-        <CallProblem lang={lang} code={error} onBack={reset} />
-      )}
-      {["connecting", "listening", "replying"].includes(state) && (
-        <>
-          <span role="status">
-            {companion.name} ·{" "}
-            {labels[state as "connecting" | "listening" | "replying"]}
-          </span>
-          {caption && <p>{caption}</p>}
-          {remaining && <p>{remaining.text}</p>}
+  if (state === "connecting" || state === "listening" || state === "replying") {
+    const controls = (
+      <section className="call-panel" aria-label={labels.call}>
+        <span role="status">
+          {companion.name} · {labels[state]}
+        </span>
+        {(caption || remaining) && (
+          <div className="call-caption">
+            {caption && <p>{caption}</p>}
+            {remaining && <p>{remaining.text}</p>}
+          </div>
+        )}
+        <div className="call-actions">
+          {!portraitOpen && (
+            <Button
+              ref={reopen}
+              type="button"
+              variant="outline"
+              onClick={() => setPortraitOpen(true)}
+            >
+              {labels.show}
+            </Button>
+          )}
           {offer && (
             <Button
               variant="outline"
@@ -313,7 +312,51 @@ export default function CallPanel({
             <PhoneOff aria-hidden="true" />
             {labels.hangup}
           </Button>
+        </div>
+      </section>
+    );
+    if (!portraitOpen) return controls;
+    return (
+      <RoomDialog
+        title={companion.name}
+        closeLabel={labels.minimize}
+        className="avatar-dialog call-dialog"
+        onClose={() => {
+          setPortraitOpen(false);
+          requestAnimationFrame(() => reopen.current?.focus());
+        }}
+      >
+        <CallPortrait lang={lang} companionId={companion.id} />
+        {controls}
+      </RoomDialog>
+    );
+  }
+  return (
+    <section className="call-panel" aria-label={labels.call}>
+      {state === "checking" && <p role="status">{labels.checking}</p>}
+      {state === "consent" && (
+        <>
+          <p>
+            {labels.consent} {model || labels.model}
+            {lang === "zh" ? "。" : "."} {labels.storage}
+          </p>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={connect}
+            disabled={disabled}
+          >
+            {labels.connect}
+          </Button>
         </>
+      )}
+      {(state === "checking" || state === "consent") && (
+        <Button variant="outline" type="button" onClick={reset}>
+          {labels.cancel}
+        </Button>
+      )}
+      {state === "error" && (
+        <CallProblem lang={lang} code={error} onBack={reset} />
       )}
     </section>
   );

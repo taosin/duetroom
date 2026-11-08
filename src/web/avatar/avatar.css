@@ -110,3 +110,28 @@
   .avatar-dialog { padding: 12px; }
   .avatar-tools a { padding-inline: 6px; }
 }
+
+.call-dialog {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+.call-dialog .avatar-stage {
+  height: clamp(140px, 52dvh, 520px);
+}
+.call-dialog .call-panel {
+  max-width: none;
+}
+.call-caption {
+  max-height: 16dvh;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.call-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.call-actions button {
+  margin: 0;
+}

@@ -4,6 +4,7 @@ import { Download, RotateCcw, Square, Volume2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { followSpeech } from "./speech";
 import { greetingText, playGreeting } from "./greeting";
+import { readPlaybackMouth } from "../call/playback-mouth";
 import { RoomDialog } from "../components/RoomDialog";
 import type { Lang } from "../ui";
 import studioModel from "./studio.glb?url";
@@ -76,7 +77,13 @@ const avatars = {
   },
 };
 
-export function AvatarPreview({ lang }: { lang: Lang }) {
+export function AvatarPreview({
+  lang,
+  disabled,
+}: {
+  lang: Lang;
+  disabled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const zh = lang === "zh";
   return (
@@ -84,6 +91,7 @@ export function AvatarPreview({ lang }: { lang: Lang }) {
       <Button
         variant="outline"
         className="avatar-entry"
+        disabled={disabled}
         onClick={() => setOpen(true)}
       >
         <img src={studioPortrait} alt="" />
@@ -153,7 +161,32 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
   );
 }
 
-function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
+export function CallPortrait({
+  lang,
+  companionId,
+}: {
+  lang: Lang;
+  companionId: string;
+}) {
+  return (
+    <AvatarView
+      key={companionId + lang}
+      kind="studio"
+      lang={lang}
+      companionId={companionId}
+    />
+  );
+}
+
+function AvatarView({
+  lang,
+  kind,
+  companionId,
+}: {
+  lang: Lang;
+  kind: AvatarKind;
+  companionId?: string;
+}) {
   const zh = lang === "zh";
   const avatar = avatars[kind];
   const host = useRef<HTMLDivElement>(null);
@@ -192,10 +225,12 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
   useEffect(() => {
     const el = viewer.current;
     if (!el || kind !== "studio" || status !== "ready") return;
+    if (companionId)
+      return followSpeech(el, () => readPlaybackMouth(companionId));
     const sample = greeting.current;
     if (sample && greetingState === "playing")
       return followSpeech(el, sample.read);
-  }, [kind, lang, status, greetingState]);
+  }, [kind, lang, status, companionId, greetingState]);
 
   function toggleGreeting() {
     if (greeting.current) {
@@ -310,6 +345,7 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
       <div className="avatar-view" ref={host} hidden={status === "error"} />
     </div>
   );
+  if (companionId) return stage;
 
   return (
     <>
