@@ -1,4 +1,4 @@
-import { createMouthAnalyser, speakerTime } from "../audio/mouth";
+import { createMouthAnalyser, mouthAtRest, speakerTime } from "../audio/mouth";
 import type { Lang } from "../ui";
 import english from "./hello-en.wav?url";
 import chinese from "./hello-zh.wav?url";
@@ -14,22 +14,56 @@ export function playGreeting(lang: Lang, ended: (failed: boolean) => void) {
   const audio = new AudioContext();
   const analyser = createMouthAnalyser(audio);
   const player = audio.createBufferSource();
+  const volume = audio.createGain();
   const abort = new AbortController();
   let stopped = false;
   let finishTimer: number | undefined;
   let start = Infinity;
   let end = -Infinity;
 
+  function release() {
+    window.clearTimeout(finishTimer);
+    player.onended = null;
+    player.disconnect();
+    volume.disconnect();
+    analyser.node.disconnect();
+    void audio.close().catch(() => {});
+  }
+
+  function finishAfterPlayback() {
+    window.clearTimeout(finishTimer);
+    // Let both the render thread and the speaker drain the last samples.
+    const played = Math.min(audio.currentTime, speakerTime(audio));
+    finishTimer = window.setTimeout(
+      () => {
+        release();
+        if (!stopped) {
+          stopped = true;
+          ended(false);
+        }
+      },
+      Math.max(0, end - played) * 1000,
+    );
+  }
+
   function stop() {
     if (stopped) return;
     stopped = true;
     abort.abort();
-    window.clearTimeout(finishTimer);
+    if (!Number.isFinite(start) || audio.state !== "running") {
+      release();
+      return;
+    }
+    const now = audio.currentTime;
+    if (now < end) {
+      // A hard cut at a voiced sample creates a click.
+      end = Math.min(end, now + 0.012);
+      volume.gain.setValueAtTime(1, now);
+      volume.gain.linearRampToValueAtTime(0, end);
+      player.stop(end);
+    }
     player.onended = null;
-    if (Number.isFinite(start)) player.stop();
-    player.disconnect();
-    analyser.node.disconnect();
-    void audio.close().catch(() => {});
+    finishAfterPlayback();
   }
 
   async function load() {
@@ -41,16 +75,10 @@ export function playGreeting(lang: Lang, ended: (failed: boolean) => void) {
     const buffer = await audio.decodeAudioData(await response.arrayBuffer());
     if (stopped) return;
     player.buffer = buffer;
-    player.connect(analyser.node);
+    player.connect(volume);
+    volume.connect(analyser.node);
     analyser.node.connect(audio.destination);
-    player.onended = () => {
-      // Rendering finishes before the last samples reach the speakers.
-      const tail = Math.max(0, end - speakerTime(audio)) * 1000;
-      finishTimer = window.setTimeout(() => {
-        stop();
-        ended(false);
-      }, tail);
-    };
+    player.onended = finishAfterPlayback;
     start = audio.currentTime;
     end = start + buffer.duration;
     player.start(start);
@@ -58,9 +86,14 @@ export function playGreeting(lang: Lang, ended: (failed: boolean) => void) {
 
   void load().catch(() => {
     if (!stopped) {
-      stop();
+      stopped = true;
+      abort.abort();
+      release();
       ended(true);
     }
   });
-  return { read: () => analyser.read(start, end), stop };
+  return {
+    read: () => (stopped ? mouthAtRest : analyser.read(start, end)),
+    stop,
+  };
 }
