@@ -8,6 +8,8 @@ class DuetAudio extends AudioWorkletProcessor {
     this.cursor = 0;
     this.hold = 0;
     this.speaking = false;
+    this.rampFrames = Math.ceil(sampleRate * 0.004);
+    this.clearRamp();
     this.capture = new Int16Array(320);
     this.count = 0;
     this.phase = 0;
@@ -19,6 +21,7 @@ class DuetAudio extends AudioWorkletProcessor {
         this.hold = 0;
         this.speaking = false;
         this.cursor = 0;
+        this.clearRamp();
       } else if (
         data.generation === this.generation &&
         (data.type === "pcm" || data.type === "end")
@@ -79,12 +82,32 @@ class DuetAudio extends AudioWorkletProcessor {
       at: (currentFrame + offset) / sampleRate,
     });
   }
+  clearRamp() {
+    this.ramp = 0;
+    this.rampFrom = 0;
+    this.lastSample = null;
+  }
+  startRamp() {
+    this.rampFrom = this.lastSample;
+    this.ramp = this.rampFrames;
+  }
+  mix(sample) {
+    if (this.ramp > 0) {
+      this.ramp--;
+      sample += (this.rampFrom - sample) * (this.ramp / this.rampFrames);
+    }
+    this.lastSample = sample;
+    return sample;
+  }
   process(inputs, outputs) {
     if (inputs[0]?.[0]) this.captureInput(inputs[0][0]);
     const output = outputs[0][0];
     const skip = Math.min(this.hold, output.length);
     this.hold -= skip;
-    if (skip && this.speaking) this.setSpeaking(false, 0);
+    if (skip) {
+      this.clearRamp();
+      if (this.speaking) this.setSpeaking(false, 0);
+    }
     for (let i = skip; i < output.length; i++) {
       while (this.queue.length && this.queue[0].type === "end") {
         const marker = this.queue.shift();
@@ -97,15 +120,26 @@ class DuetAudio extends AudioWorkletProcessor {
       }
       const chunk = this.queue[0];
       if (!chunk) {
-        if (this.speaking) this.setSpeaking(false, i);
-        break;
+        if (this.speaking) {
+          // The next packet is late. Ease the current output to silence.
+          this.setSpeaking(false, i);
+          this.startRamp();
+        }
+        if (!this.ramp) break;
+        output[i] = this.mix(0);
+        continue;
       }
-      if (!this.speaking) this.setSpeaking(true, i);
+      if (!this.speaking) {
+        // Ramp up only after a gap. A fresh generation starts at its first sample.
+        if (this.lastSample !== null) this.startRamp();
+        this.setSpeaking(true, i);
+      }
       const index = Math.floor(this.cursor);
       const fraction = this.cursor - index;
       const a = chunk.samples[index];
-      const b = chunk.samples[Math.min(index + 1, chunk.samples.length - 1)];
-      output[i] = (a + (b - a) * fraction) / 32768;
+      // Interpolate across PCM packets; segment-end markers have no samples.
+      const b = chunk.samples[index + 1] ?? this.queue[1]?.samples?.[0] ?? a;
+      output[i] = this.mix((a + (b - a) * fraction) / 32768);
       this.cursor += 24000 / sampleRate;
       if (this.cursor >= chunk.samples.length) {
         this.cursor -= chunk.samples.length;
