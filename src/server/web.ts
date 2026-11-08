@@ -1,7 +1,7 @@
 import {createReadStream,existsSync,statSync} from 'node:fs'
 import {join,extname,resolve} from 'node:path'
 import type { FastifyInstance, FastifyReply } from 'fastify'
-const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.glb':'model/gltf-binary','.hdr':'image/vnd.radiance','.woff2':'font/woff2'}
+const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.wav':'audio/wav','.glb':'model/gltf-binary','.hdr':'image/vnd.radiance','.woff2':'font/woff2'}
 export function serveWeb(app:FastifyInstance){
   const root=resolve('dist/web')
   function send(reply:FastifyReply,dir:string,file:string){

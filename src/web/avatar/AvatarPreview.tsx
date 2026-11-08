@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ModelViewerElement } from "@google/model-viewer";
-import { Download, RotateCcw } from "lucide-react";
+import { Download, RotateCcw, Square, Volume2 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { followSpeech } from "./speech";
+import { greetingText, playGreeting } from "./greeting";
 import { RoomDialog } from "../components/RoomDialog";
 import type { Lang } from "../ui";
 import studioModel from "./studio.glb?url";
@@ -15,6 +17,25 @@ import "./avatar.css";
 
 const avatarKinds = ["studio", "scan", "animated"] as const;
 type AvatarKind = (typeof avatarKinds)[number];
+
+const hints = {
+  zh: {
+    loading: "正在加载形象…",
+    ready: "拖动旋转，滚动或双指缩放。",
+    error: "当前无法显示 3D 模型。可以下载模型查看。",
+    audioError: "问候播放失败，可以重试。",
+    play: "试听问候",
+    stop: "停止试听",
+  },
+  en: {
+    loading: "Loading avatar…",
+    ready: "Drag to rotate. Scroll or pinch to zoom.",
+    error: "3D view unavailable. Download the model to open it locally.",
+    audioError: "Couldn’t play the greeting. Try again.",
+    play: "Play greeting",
+    stop: "Stop greeting",
+  },
+};
 
 const avatars = {
   studio: {
@@ -100,7 +121,7 @@ function AvatarStudio({ lang, onClose }: { lang: Lang; onClose: () => void }) {
           </Button>
         ))}
       </div>
-      <AvatarView key={kind} kind={kind} lang={lang} />
+      <AvatarView key={kind + lang} kind={kind} lang={lang} />
       {kind !== "animated" && (
         <small className="avatar-credit">
           <a
@@ -142,6 +163,58 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
   );
   const [full, setFull] = useState(false);
 
+  const greeting = useRef<ReturnType<typeof playGreeting> | null>(null);
+  const [greetingState, setGreetingState] = useState<
+    "idle" | "playing" | "error"
+  >("idle");
+
+  useEffect(() => {
+    function stop() {
+      greeting.current?.stop();
+      greeting.current = null;
+    }
+    function stopPreview() {
+      stop();
+      setGreetingState("idle");
+    }
+    function hide() {
+      if (document.hidden) stopPreview();
+    }
+    document.addEventListener("visibilitychange", hide);
+    window.addEventListener("pagehide", stopPreview);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", hide);
+      window.removeEventListener("pagehide", stopPreview);
+    };
+  }, [lang]);
+
+  useEffect(() => {
+    const el = viewer.current;
+    if (!el || kind !== "studio" || status !== "ready") return;
+    const sample = greeting.current;
+    if (sample && greetingState === "playing")
+      return followSpeech(el, sample.read);
+  }, [kind, lang, status, greetingState]);
+
+  function toggleGreeting() {
+    if (greeting.current) {
+      greeting.current.stop();
+      greeting.current = null;
+      setGreetingState("idle");
+      return;
+    }
+    try {
+      greeting.current = playGreeting(lang, (failed) => {
+        greeting.current = null;
+        setGreetingState(failed ? "error" : "idle");
+      });
+      setGreetingState("playing");
+    } catch {
+      setGreetingState("error");
+    }
+  }
+
   useEffect(() => {
     // Loading the GLB can succeed even when the browser cannot draw it.
     const probe = document.createElement("canvas").getContext("webgl2");
@@ -165,6 +238,8 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
     };
     const ready = () => {
       setStatus("ready");
+      if (kind === "studio" && viewer.current)
+        viewer.current.animationName = "Portrait idle";
       updateMotion();
     };
     const failed = () => setStatus("error");
@@ -223,32 +298,43 @@ function AvatarView({ lang, kind }: { lang: Lang; kind: AvatarKind }) {
     setFull(wide);
   }
 
+  const stage = (
+    <div className="avatar-stage" data-avatar={kind}>
+      {status !== "ready" && (
+        <img
+          className="avatar-fallback"
+          src={avatar.poster}
+          alt={zh ? "数字人肖像" : "Avatar portrait"}
+        />
+      )}
+      <div className="avatar-view" ref={host} hidden={status === "error"} />
+    </div>
+  );
+
   return (
     <>
-      <div className="avatar-stage" data-avatar={kind}>
-        {status !== "ready" && (
-          <img
-            className="avatar-fallback"
-            src={avatar.poster}
-            alt={zh ? "数字人肖像" : "Avatar portrait"}
-          />
-        )}
-        <div className="avatar-view" ref={host} hidden={status === "error"} />
-      </div>
+      {stage}
       <p className="avatar-hint" role="status">
-        {status === "error"
-          ? zh
-            ? "当前无法显示 3D 模型。可以下载模型查看。"
-            : "3D view unavailable. Download the model to open it locally."
-          : status === "loading"
-            ? zh
-              ? "正在加载形象…"
-              : "Loading avatar…"
-            : zh
-              ? "拖动旋转，滚动或双指缩放。"
-              : "Drag to rotate. Scroll or pinch to zoom."}
+        {greetingState === "playing"
+          ? greetingText[lang]
+          : greetingState === "error"
+            ? hints[lang].audioError
+            : hints[lang][status]}
       </p>
       <div className="avatar-tools">
+        {kind === "studio" && (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={status === "loading"}
+            aria-pressed={greetingState === "playing"}
+            onClick={toggleGreeting}
+          >
+            {greetingState === "playing" ? <Square /> : <Volume2 />}
+            {greetingState === "playing" ? hints[lang].stop : hints[lang].play}
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
