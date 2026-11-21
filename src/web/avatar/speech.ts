@@ -43,13 +43,11 @@ export function followSpeech(
   function tick(time: number) {
     const shape = read();
     const dt = lastTime ? Math.min(100, time - lastTime) : 16;
-    const alpha = 1 - Math.exp(-dt / 25);
-    if (shape.open === 0 && shape.round === 0) {
-      open = round = 0;
-    } else {
-      open += (shape.open - open) * alpha;
-      round += (shape.round - round) * alpha;
-    }
+    // Brief pauses between syllables let the lips close over a few frames.
+    const settling = shape.open + shape.round < open + round;
+    const alpha = 1 - Math.exp(-dt / (settling ? 45 : 25));
+    open += (shape.open - open) * alpha;
+    round += (shape.round - round) * alpha;
     blend(0, open);
     blend(1, round);
     lastTime = time;
